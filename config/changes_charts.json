@@ -1,0 +1,50 @@
+{
+  "cards": [
+    {
+      "id": "change-counts",
+      "title": "Changes Overview",
+      "type": "number",
+      "numbers": [
+        {"label": "Total", "filter": {}},
+        {"label": "Pending", "filter": {"Status": "Pending Approval"}},
+        {"label": "In Progress", "filter": {"Status": "In Progress"}},
+        {"label": "Completed", "filter": {"Status": "Completed,Normal"}}
+      ]
+    },
+    {
+      "id": "change-status-bar",
+      "title": "Changes by Status",
+      "type": "bar",
+      "groupBy": "Status",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "change-type-pie",
+      "title": "Change Type Distribution",
+      "type": "pie",
+      "groupBy": "Type"
+    },
+    {
+      "id": "change-risk-polar",
+      "title": "Risk Profile",
+      "type": "polarArea",
+      "groupBy": "Risk",
+      "color": "#f59e0b"
+    },
+    {
+      "id": "change-team-bar",
+      "title": "Changes by Team",
+      "type": "horizontalBar",
+      "groupBy": "Team",
+      "color": "#10b981"
+    },
+    {
+      "id": "change-timeline",
+      "title": "Changes Submitted Over Time",
+      "type": "area",
+      "groupBy": "Submitted Date",
+      "color": "#6366f1",
+      "chartHeight": 200
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "cards": [
+    {
+      "id": "incident-counts",
+      "type": "number",
+      "title": "Incidents",
+      "numbers": [
+        { "label": "Total", "color": "#6366f1" },
+        { "label": "Open", "color": "#f59e0b", "filter": { "Status": ["New", "In Progress", "Waiting for Info"] } },
+        { "label": "Overdue", "color": "#ef4444", "filter": { "Status": ["New", "In Progress", "Waiting for Info"], "overdue": true } }
+      ]
+    },
+    {
+      "id": "overdue-gauge",
+      "type": "gauge",
+      "title": "Overdue",
+      "filter": {
+        "Status": ["New", "In Progress", "Waiting for Info"],
+        "overdue": true
+      },
+      "color": "#ef4444",
+      "gaugeMax": 30
+    },
+    {
+      "id": "status-bar",
+      "type": "bar",
+      "title": "Incidents by Status",
+      "groupBy": "Status"
+    },
+    {
+      "id": "user-bar",
+      "type": "horizontalBar",
+      "title": "Incidents by User",
+      "groupBy": "Responsible",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "status-priority-stacked",
+      "type": "stackedBar",
+      "title": "Incidents by Status & Priority",
+      "groupBy": "Status",
+      "stackBy": "Priority"
+    },
+    {
+      "id": "priority-doughnut",
+      "type": "doughnut",
+      "title": "By Priority",
+      "groupBy": "Priority"
+    },
+    {
+      "id": "status-pie",
+      "type": "pie",
+      "title": "Status Distribution",
+      "groupBy": "Status"
+    },
+    {
+      "id": "group-polar",
+      "type": "polarArea",
+      "title": "By Group (Polar)",
+      "groupBy": "Group",
+      "width": 1
+    },
+    {
+      "id": "priority-radar",
+      "type": "radar",
+      "title": "Priority Radar",
+      "groupBy": "Priority",
+      "color": "#f59e0b"
+    },
+    {
+      "id": "priority-radar2",
+      "type": "radar",
+      "title": "User Radar",
+      "groupBy": "Responsible",
+      "color": "#f59e0b"
+    },    
+    {
+      "id": "created-timeline",
+      "type": "area",
+      "title": "Created Over Time (Area)",
+      "dateField": "Creation Date",
+      "groupBy": "Creation Date",
+      "width": 3,
+      "chartHeight": 350,
+      "color": "#10b981"
+    },
+    {
+      "id": "priority-scatter",
+      "type": "scatter",
+      "title": "Incidents Over Time by Priority",
+      "groupBy": "Priority",
+      "dateField": "Creation Date",
+      "width": 4,
+      "chartHeight": 350
+    },
+    {
+      "id": "group-bubble",
+      "type": "bubble",
+      "title": "Activity Bubble (Group × Priority × Volume)",
+      "groupBy": "Group",
+      "width": 4,
+      "chartHeight": 350
+    }
+  ]
+}

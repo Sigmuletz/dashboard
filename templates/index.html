@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://unpkg.com/feather-icons"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <!-- Apply saved theme before first paint (blocking, zero-layout) -->
+  <script>
+    (function() {
+      var t = localStorage.getItem('dashboard-theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body class="bg-surface text-slate-200 font-sans antialiased">
+
+  <!-- Header -->
+  <header class="h-14 border-b border-slate-700/50 flex items-center justify-between px-5 bg-surface-elevated z-30 relative">
+    <div class="flex items-center gap-3">
+      <button id="sidebarToggle" class="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors" aria-label="Toggle filters">
+        <i data-feather="menu" class="w-5 h-5 text-slate-400"></i>
+      </button>
+      <h1 class="text-lg font-semibold tracking-tight text-white">Dashboard</h1>
+    </div>
+    <div class="flex items-center gap-3 text-xs text-slate-500">
+      <!-- Dataset Switcher -->
+      <div class="dataset-selector" id="datasetSelector">
+        <button class="dataset-selector-btn" id="datasetToggle">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span id="datasetLabel">Incidents</span>
+          <span class="chevron">▾</span>
+        </button>
+        <div class="dataset-menu">
+          <!-- Rendered dynamically by app.js from /api/datasets -->
+        </div>
+      </div>
+      <!-- Theme Selector -->
+      <div class="theme-selector" id="themeSelector">
+        <button class="theme-selector-btn" id="themeToggle">
+          <span class="swatch midnight"></span>
+          <span id="themeLabel">Midnight</span>
+          <span class="chevron">▾</span>
+        </button>
+        <div class="theme-menu">
+          <button class="theme-option active" data-theme="midnight">
+            <span class="swatch midnight"></span> Midnight
+          </button>
+          <button class="theme-option" data-theme="charcoal">
+            <span class="swatch charcoal"></span> Charcoal
+          </button>
+          <button class="theme-option" data-theme="omnitracker">
+            <span class="swatch omnitracker"></span> Omnitracker
+          </button>
+        </div>
+      </div>
+      <span class="flex items-center gap-1.5">
+        <span class="live-dot"></span>
+        Live
+      </span>
+      <span id="lastUpdated">Loading…</span>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <div class="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+
+    <!-- Left Sidebar: Filters -->
+    <aside id="filterSidebar" class="border-r border-slate-700/50 bg-surface-elevated sidebar-closed overflow-y-auto z-20">
+      <div class="p-4">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">Filters</h2>
+        <div id="filterContainer">
+          <!-- Rendered by filters.js -->
+        </div>
+        <div class="flex gap-2 mt-6">
+          <button id="applyFilters" class="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">Apply</button>
+          <button id="resetFilters" class="py-2 px-3 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Reset</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Middle: Charts + Table -->
+    <main class="flex-1 overflow-y-auto p-5">
+      <!-- Chart Cards Grid -->
+      <div id="chartGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- Rendered by charts.js -->
+      </div>
+
+      <!-- Incident Table -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-500" id="tableSectionTitle">Items</h2>
+          <div class="flex items-center gap-2">
+            <!-- Column Picker -->
+            <div class="column-picker" id="columnPickerContainer">
+              <button id="columnPickerBtn" class="column-picker-btn" title="Select columns">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Columns</span>
+              </button>
+              <div class="column-picker-menu" id="columnPickerMenu">
+                <div class="column-picker-list" id="columnPickerList">
+                  <!-- Rendered by columns.js -->
+                </div>
+              </div>
+            </div>
+            <!-- Search -->
+            <div class="relative">
+              <i data-feather="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+              <input id="tableSearch" type="text" placeholder="Search…" class="pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-56 transition-colors">
+            </div>
+          </div>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-slate-700/50">
+          <table class="w-full text-sm">
+            <thead id="incidentTableHead">
+              <!-- Rendered dynamically by table.js from columns.js config -->
+            </thead>
+            <tbody id="incidentTableBody">
+              <!-- Rendered by table.js -->
+            </tbody>
+          </table>
+        </div>
+        <p id="tableCount" class="text-xs text-slate-500 mt-2"></p>
+      </section>
+    </main>
+
+    <!-- Right Sidebar: Notifications -->
+    <aside class="w-72 flex-shrink-0 border-l border-slate-700/50 bg-surface-elevated overflow-y-auto">
+      <div class="p-4">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">Recent Activity</h2>
+        <div id="notificationList" class="space-y-2">
+          <!-- Rendered by notifications.js -->
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Theme selector UI + persistence (runs after DOM ready) -->
+  <script>
+    (function() {
+      var STORAGE_KEY = 'dashboard-theme';
+      var html = document.documentElement;
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var selector = document.getElementById('themeSelector');
+        var toggle = document.getElementById('themeToggle');
+        var label = document.getElementById('themeLabel');
+        var swatch = toggle.querySelector('.swatch');
+        var options = selector.querySelectorAll('.theme-option');
+
+        function setTheme(theme) {
+          html.setAttribute('data-theme', theme);
+          localStorage.setItem(STORAGE_KEY, theme);
+          var names = { midnight: 'Midnight', charcoal: 'Charcoal', omnitracker: 'Omnitracker' };
+          var name = names[theme] || 'Midnight';
+          label.textContent = name;
+          swatch.className = 'swatch ' + theme;
+          options.forEach(function(o) {
+            o.classList.toggle('active', o.dataset.theme === theme);
+          });
+        }
+
+        toggle.addEventListener('click', function(e) {
+          e.stopPropagation();
+          selector.classList.toggle('open');
+        });
+
+        options.forEach(function(opt) {
+          opt.addEventListener('click', function(e) {
+            e.stopPropagation();
+            setTheme(opt.dataset.theme);
+            selector.classList.remove('open');
+          });
+        });
+
+        document.addEventListener('click', function() {
+          selector.classList.remove('open');
+        });
+
+        var current = html.getAttribute('data-theme') || 'midnight';
+        setTheme(current);
+      });
+    })();
+  </script>
+
+  <!-- Scripts load order matters: app.js first (creates EventBus), then modules -->
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

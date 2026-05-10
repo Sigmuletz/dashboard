@@ -1,0 +1,22 @@
+{
+  "datasets": [
+    {
+      "id": "incidents",
+      "title": "Incidents",
+      "csv": "data/incidents.csv",
+      "charts": "config/incidents_charts.json"
+    },
+    {
+      "id": "changes",
+      "title": "Changes",
+      "csv": "data/changes.csv",
+      "charts": "config/changes_charts.json"
+    },
+    {
+      "id": "requests",
+      "title": "Requests",
+      "csv": "data/requests.csv",
+      "charts": "config/requests_charts.json"
+    }
+  ]
+}

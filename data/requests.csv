@@ -1,0 +1,16 @@
+ID,Subject,Requester,Category,Channel,Status,Priority,Assigned To,Created Date,Resolved Date,SLA Deadline
+REQ-001,New laptop setup for marketing team,Sarah Meyer,Hardware,Email,Open,Medium,Jan Weber,2026-04-20,,2026-04-27
+REQ-002,VPN access for remote contractor,Markus Bauer,Access,Portal,Resolved,High,Kai Schneider,2026-04-21,2026-04-22,2026-04-23
+REQ-003,Create new shared mailbox for HR,Laura Schmidt,Email,Email,In Progress,Low,Tom Hoffmann,2026-04-22,,2026-04-29
+REQ-004,Install Adobe Creative Suite on 5 machines,Felix Wagner,Software,Portal,Resolved,Medium,Jan Weber,2026-04-23,2026-04-25,2026-04-30
+REQ-005,Reset MFA token for CEO,Nina Hartmann,Access,Phone,Critical,Waiting for Info,Kai Schneider,2026-04-25,,2026-04-25
+REQ-006,Onboard new developer accounts x3,Markus Bauer,Access,Email,Resolved,High,Kai Schneider,2026-04-26,2026-04-27,2026-04-28
+REQ-007,Printer cartridge replacement floor 3,Sarah Meyer,Hardware,Portal,Open,Low,Jan Weber,2026-04-28,,2026-05-05
+REQ-008,Database read-only access for analytics team,Laura Schmidt,Access,Email,Resolved,Medium,Mia Fischer,2026-04-29,2026-04-30,2026-05-01
+REQ-009,Configure conference room AV system,Felix Wagner,Hardware,Phone,In Progress,Medium,Tom Hoffmann,2026-04-30,,2026-05-07
+REQ-010,SAP license renewal for finance dept,Laura Schmidt,Software,Email,Approved,High,Nina Becker,2026-05-01,,2026-05-15
+REQ-011,WiFi coverage survey for new office wing,Markus Bauer,Network,Portal,Open,Medium,Lisa Brandt,2026-05-02,,2026-05-09
+REQ-012,Archive 2024 email PST files,Laura Schmidt,Email,Email,In Progress,Low,Tom Hoffmann,2026-05-03,,2026-05-10
+REQ-013,SSL VPN client upgrade rollout,Sarah Meyer,Software,Portal,Approved,High,Kai Schneider,2026-05-04,,2026-05-11
+REQ-014,Decommission old print server,Felix Wagner,Infrastructure,Email,Open,Low,Nina Becker,2026-05-05,,2026-05-12
+REQ-015,Urgent CEO laptop replacement,Nina Hartmann,Hardware,Phone,Critical,In Progress,Jan Weber,2026-05-06,,2026-05-07

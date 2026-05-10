@@ -1,0 +1,31 @@
+Number,CostCenter,Group,Responsible,Description,Status,Priority,Due Date,Creation Date
+INC-001,01,Network,Kai Schneider,VPN tunnel to branch office down,In Progress,Critical,2026-05-02,2026-04-28
+INC-002,01,Database,Mia Fischer,Replication lag on slave node DB-04,In Progress,High,2026-05-05,2026-04-30
+INC-003,01,Applications,Jan Weber,Login page returns 500 after deployment,Resolved,Critical,2026-05-01,2026-04-27
+INC-004,01,Security,Nina Becker,Suspicious login attempts from external IP,In Progress,High,2026-05-06,2026-05-01
+INC-005,01,Infrastructure,Tom Hoffmann,Disk space critical on app-server-02,Resolved,High,2026-05-04,2026-04-29
+INC-006,01,Network,Kai Schneider,DNS resolution timeout for internal services,Waiting for Info,Medium,2026-05-10,2026-05-02
+INC-007,06,Applications,Jan Weber,Batch job nightly-report stuck for 3 hours,In Progress,Medium,2026-05-08,2026-05-03
+INC-008,02,Database,Mia Fischer,Slow query on customer_orders table,New,Medium,2026-05-12,2026-05-07
+INC-009,02,Security,Nina Becker,SSL certificate expires in 7 days on api-gateway,New,High,2026-05-09,2026-05-02
+INC-010,02,Infrastructure,Tom Hoffmann,Load balancer health checks failing,In Progress,Critical,2026-05-03,2026-04-28
+INC-011,02,Applications,Lisa Brandt,Mobile app crash on Android 15,Waiting for Info,High,2026-05-07,2026-04-30
+INC-012,02,Network,Kai Schneider,Firewall rule blocking port 8443 traffic,Resolved,Medium,2026-05-06,2026-04-29
+INC-013,02,Database,Mia Fischer,Backup job failed with exit code 3,In Progress,High,2026-05-05,2026-05-01
+INC-014,02,Security,Nina Becker,Privilege escalation attempt detected,Closed,Critical,2026-05-02,2026-04-26
+INC-015,02,Infrastructure,Tom Hoffmann,NTP sync offset exceeds threshold,New,Low,2026-05-15,2026-05-07
+INC-016,02,Applications,Jan Weber,API rate limit exceeded for partner integration,Resolved,Medium,2026-05-03,2026-04-27
+INC-017,01,Network,Lisa Brandt,WiFi outage on floor 3,Resolved,High,2026-05-04,2026-04-30
+INC-018,01,Database,Nina Becker,Deadlock detected on inventory table,In Progress,High,2026-05-06,2026-05-02
+INC-019,01,Applications,Jan Weber,PDF export generates blank pages,New,Low,2026-05-18,2026-05-05
+INC-020,03,Security,Kai Schneider,Endpoint protection alerts on workstation WS-73,In Progress,Medium,2026-05-09,2026-05-04
+INC-021,03,Infrastructure,Tom Hoffmann,ESXi host lost network connectivity,Closed,Critical,2026-05-01,2026-04-25
+INC-022,03,Network,Lisa Brandt,BGP session flapping with ISP,In Progress,Critical,2026-05-03,2026-04-28
+INC-023,03,Database,Mia Fischer,Data inconsistency in reporting DB,Waiting for Info,High,2026-05-10,2026-05-03
+INC-024,03,Applications,Nina Becker,SSO integration broken after IdP update,In Progress,High,2026-05-07,2026-05-01
+INC-025,03,Infrastructure,Jan Weber,Monitoring agent not reporting metrics,New,Low,2026-05-20,2026-05-06
+INC-026,03,Security,Tom Hoffmann,Phishing email reported by 15 users,In Progress,High,2026-05-05,2026-05-01
+INC-027,03,Network,Kai Schneider,Latency spikes on MPLS link to DC2,In Progress,Medium,2026-05-11,2026-05-04
+INC-028,01,Database,Lisa Brandt,Schema migration rollback needed,New,Medium,2026-05-14,2026-05-06
+INC-029,01,Applications,Jan Weber,Cache invalidation not triggering after deploy,Resolved,Medium,2026-05-07,2026-05-02
+INC-030,05,Infrastructure,Tom Hoffmann,Cooling failure alarm in rack B12,New,Critical,2026-05-08,2026-05-0701
