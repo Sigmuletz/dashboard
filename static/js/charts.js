@@ -16,6 +16,11 @@ let cachedConfig = null;     // charts.json cards array, fetched once
 let renderActive = false;
 let pendingRender = null;
 let abortController = null;  // cancel stale chart fetches on dataset switch
+let lastFilters = {};        // preserved for re-render after card reorder/resize
+
+// ── Lazy loading state ─────────────────────────────────────────────
+let renderedCardIds = new Set();   // cards with active Chart instances
+let lazyObserver = null;           // IntersectionObserver for below-fold cards
 
 const PALETTE = [
   '#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd',
@@ -47,6 +52,7 @@ export function initCharts() {
   ChartLib.defaults.font.family = 'system-ui, -apple-system, sans-serif';
 
   bus.on('filters-changed', (filters) => {
+    lastFilters = filters || {};
     if (renderActive) {
       pendingRender = filters;
       return;
@@ -66,6 +72,12 @@ export function initCharts() {
       try { chartInstances[id].destroy(); } catch (e) { /* ignore */ }
       delete chartInstances[id];
     }
+    // Disconnect lazy observer
+    if (lazyObserver) {
+      lazyObserver.disconnect();
+      lazyObserver = null;
+    }
+    renderedCardIds.clear();
     // Show skeleton placeholders
     const grid = document.getElementById('chartGrid');
     if (grid) {
@@ -89,6 +101,67 @@ export function initCharts() {
   });
 }
 
+/* ── Lazy loading helpers ─────────────────────────────────────────── */
+
+function initLazyObserver() {
+  if (lazyObserver) lazyObserver.disconnect();
+  lazyObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const cardEl = entry.target;
+        const cardId = cardEl.dataset.cardId;
+        if (!cardId || renderedCardIds.has(cardId)) continue;
+        lazyObserver.unobserve(cardEl);
+        renderLazyCard(cardId, cardEl);
+      }
+    }
+  }, { rootMargin: '300px' });
+}
+
+async function renderLazyCard(cardId, cardEl) {
+  const card = cachedConfig.find(c => c.id === cardId);
+  if (!card) return;
+  try {
+    const data = await apiFetch(`/api/chart-data/${card.id}`, lastFilters);
+    cardEl.querySelector('.chart-content').innerHTML = '';
+    switch (card.type) {
+      case 'number':        renderNumberCard(cardEl, data); break;
+      case 'gauge':         renderGaugeCard(cardEl, data, card); break;
+      case 'bar':           renderBarChart(cardEl, data, card); break;
+      case 'horizontalBar': renderHorizontalBarChart(cardEl, data, card); break;
+      case 'stackedBar':    renderStackedBarChart(cardEl, data, card); break;
+      case 'doughnut':      renderDoughnutChart(cardEl, data, card); break;
+      case 'pie':           renderPieChart(cardEl, data, card); break;
+      case 'polarArea':     renderPolarAreaChart(cardEl, data, card); break;
+      case 'radar':         renderRadarChart(cardEl, data, card); break;
+      case 'line':          renderLineChart(cardEl, data, card); break;
+      case 'area':          renderAreaChart(cardEl, data, card); break;
+      case 'scatter':       renderScatterChart(cardEl, data, card); break;
+      case 'bubble':        renderBubbleChart(cardEl, data, card); break;
+      default:              cardEl.querySelector('.chart-content').innerHTML = '<p class="text-slate-600 text-sm">Unknown chart type</p>';
+    }
+    renderedCardIds.add(cardId);
+  } catch (err) {
+    console.error(`[Charts] Lazy card ${card.id} failed:`, err);
+    showCardError(cardEl, card);
+  }
+}
+
+function showCardError(el, card) {
+  el.querySelector('.chart-content').innerHTML = `
+    <div class="text-center py-4">
+      <p class="text-red-400 text-xs mb-2">Failed to load</p>
+      <button class="chart-retry-btn" data-card="${card.id}">Retry</button>
+    </div>`;
+}
+
+function isCardInViewport(el) {
+  const rect = el.getBoundingClientRect();
+  return rect.top < window.innerHeight + 300 && rect.bottom > -300;
+}
+
+/* ── Main render loop ─────────────────────────────────────────────── */
+
 async function doRender(filters) {
   renderActive = true;
   const grid = document.getElementById('chartGrid');
@@ -111,54 +184,67 @@ async function doRender(filters) {
 
     const isFirstRender = Object.keys(cardElements).length === 0;
 
-    for (const card of cachedConfig) {
-      try {
-        const data = await apiFetch(`/api/chart-data/${card.id}`, filters);
-        if (signal.aborted) return;
+    if (isFirstRender) {
+      // ── First render: create DOM for all cards, render only visible ones ──
+      initLazyObserver();
 
-        if (isFirstRender) {
-          // Build DOM + create chart
-          const cardEl = createCardElement(card);
-          grid.appendChild(cardEl);
-          cardElements[card.id] = cardEl;
+      for (const card of cachedConfig) {
+        const cardEl = createCardElement(card);
+        grid.appendChild(cardEl);
+        cardElements[card.id] = cardEl;
 
-          switch (card.type) {
-            case 'number':   renderNumberCard(cardEl, data); break;
-            case 'gauge':    renderGaugeCard(cardEl, data, card); break;
-            case 'bar':      renderBarChart(cardEl, data, card); break;
-            case 'horizontalBar': renderHorizontalBarChart(cardEl, data, card); break;
-            case 'stackedBar':   renderStackedBarChart(cardEl, data, card); break;
-            case 'doughnut':     renderDoughnutChart(cardEl, data, card); break;
-            case 'pie':          renderPieChart(cardEl, data, card); break;
-            case 'polarArea':    renderPolarAreaChart(cardEl, data, card); break;
-            case 'radar':        renderRadarChart(cardEl, data, card); break;
-            case 'line':         renderLineChart(cardEl, data, card); break;
-            case 'area':         renderAreaChart(cardEl, data, card); break;
-            case 'scatter':      renderScatterChart(cardEl, data, card); break;
-            case 'bubble':       renderBubbleChart(cardEl, data, card); break;
-            default:             cardEl.querySelector('.chart-content').innerHTML = '<p class="text-slate-600 text-sm">Unknown chart type</p>';
+        if (isCardInViewport(cardEl)) {
+          // Render immediately
+          try {
+            const data = await apiFetch(`/api/chart-data/${card.id}`, filters);
+            if (signal.aborted) return;
+            switch (card.type) {
+              case 'number':        renderNumberCard(cardEl, data); break;
+              case 'gauge':         renderGaugeCard(cardEl, data, card); break;
+              case 'bar':           renderBarChart(cardEl, data, card); break;
+              case 'horizontalBar': renderHorizontalBarChart(cardEl, data, card); break;
+              case 'stackedBar':    renderStackedBarChart(cardEl, data, card); break;
+              case 'doughnut':      renderDoughnutChart(cardEl, data, card); break;
+              case 'pie':           renderPieChart(cardEl, data, card); break;
+              case 'polarArea':     renderPolarAreaChart(cardEl, data, card); break;
+              case 'radar':         renderRadarChart(cardEl, data, card); break;
+              case 'line':          renderLineChart(cardEl, data, card); break;
+              case 'area':          renderAreaChart(cardEl, data, card); break;
+              case 'scatter':       renderScatterChart(cardEl, data, card); break;
+              case 'bubble':        renderBubbleChart(cardEl, data, card); break;
+              default:              cardEl.querySelector('.chart-content').innerHTML = '<p class="text-slate-600 text-sm">Unknown chart type</p>';
+            }
+            renderedCardIds.add(card.id);
+          } catch (err) {
+            if (signal.aborted) return;
+            console.error(`[Charts] Card ${card.id} failed:`, err);
+            showCardError(cardEl, card);
           }
         } else {
-          // Update existing chart in-place (smooth)
-          updateCard(card, data);
+          // Below fold: skeleton + observe
+          cardEl.querySelector('.chart-content').innerHTML =
+            '<div class="chart-skeleton" style="height:200px;display:flex;align-items:center;justify-content:center"><div class="animate-pulse text-slate-600 text-xs">Loading…</div></div>';
+          lazyObserver.observe(cardEl);
         }
-      } catch (err) {
-        if (signal.aborted) return;
-        console.error(`[Charts] Card ${card.id} failed:`, err);
-        const el = cardElements[card.id];
-        if (el) {
-          el.querySelector('.chart-content').innerHTML = `
-            <div class="text-center py-4">
-              <p class="text-red-400 text-xs mb-2">Failed to load</p>
-              <button class="chart-retry-btn" data-card="${card.id}">Retry</button>
-            </div>`;
+      }
+    } else {
+      // ── Filter change: update only already-rendered cards ──
+      for (const card of cachedConfig) {
+        if (!renderedCardIds.has(card.id)) continue;
+        try {
+          const data = await apiFetch(`/api/chart-data/${card.id}`, filters);
+          if (signal.aborted) return;
+          updateCard(card, data);
+        } catch (err) {
+          if (signal.aborted) return;
+          console.error(`[Charts] Card ${card.id} update failed:`, err);
         }
       }
     }
+
     // Attach retry handlers (delegated)
     grid.querySelectorAll('.chart-retry-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        // Force re-render by clearing cached config and re-emitting
         cachedConfig = null;
         doRender(filters);
       });
@@ -270,9 +356,114 @@ function updateCard(card, data) {
 function createCardElement(card) {
   const div = document.createElement('div');
   div.className = 'chart-card';
+  div.draggable = true;
+  div.dataset.cardId = card.id;
   if (card.width && card.width > 1) div.classList.add(`span-${card.width}`);
-  div.innerHTML = `<h3>${card.title}</h3><div class="chart-content"></div>`;
+  div.innerHTML = `
+    <div class="card-header">
+      <span class="card-drag-handle" title="Drag to reorder">
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="2" r="1.2" fill="currentColor"/><circle cx="8" cy="2" r="1.2" fill="currentColor"/><circle cx="4" cy="6" r="1.2" fill="currentColor"/><circle cx="8" cy="6" r="1.2" fill="currentColor"/><circle cx="4" cy="10" r="1.2" fill="currentColor"/><circle cx="8" cy="10" r="1.2" fill="currentColor"/></svg>
+      </span>
+      <h3>${card.title}</h3>
+      <div class="card-width-controls">
+        <button class="card-width-btn" data-action="decrease" title="Narrower">−</button>
+        <span class="card-width-label">${card.width || 1}</span>
+        <button class="card-width-btn" data-action="increase" title="Wider">+</button>
+      </div>
+    </div>
+    <div class="chart-content"></div>`;
+
+  // Drag handlers
+  div.addEventListener('dragstart', (e) => {
+    div.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.id);
+  });
+  div.addEventListener('dragend', () => {
+    div.classList.remove('dragging');
+    document.querySelectorAll('.chart-card.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+  div.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const dragging = document.querySelector('.chart-card.dragging');
+    if (dragging && dragging !== div) {
+      div.classList.add('drag-over');
+    }
+  });
+  div.addEventListener('dragleave', () => {
+    div.classList.remove('drag-over');
+  });
+  div.addEventListener('drop', (e) => {
+    e.preventDefault();
+    div.classList.remove('drag-over');
+    const draggedId = e.dataTransfer.getData('text/plain');
+    if (!draggedId || draggedId === card.id) return;
+    reorderCards(draggedId, card.id);
+  });
+
+  // Width button handlers
+  div.querySelector('.card-width-btn[data-action="increase"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    changeCardWidth(card.id, 1);
+  });
+  div.querySelector('.card-width-btn[data-action="decrease"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    changeCardWidth(card.id, -1);
+  });
+
   return div;
+}
+
+/* ── Card manipulation ───────────────────────────────────────────── */
+
+function reorderCards(draggedId, targetId) {
+  if (!cachedConfig) return;
+  const draggedIdx = cachedConfig.findIndex(c => c.id === draggedId);
+  const targetIdx = cachedConfig.findIndex(c => c.id === targetId);
+  if (draggedIdx === -1 || targetIdx === -1) return;
+  const [moved] = cachedConfig.splice(draggedIdx, 1);
+  cachedConfig.splice(targetIdx, 0, moved);
+  saveConfigAndRerender();
+}
+
+function changeCardWidth(cardId, delta) {
+  if (!cachedConfig) return;
+  const card = cachedConfig.find(c => c.id === cardId);
+  if (!card) return;
+  const current = card.width || 1;
+  const next = Math.max(1, Math.min(4, current + delta));
+  if (next === current) return;
+  card.width = next;
+  saveConfigAndRerender();
+}
+
+async function saveConfigAndRerender() {
+  if (!cachedConfig) return;
+  try {
+    await apiFetch('/api/charts-config', {
+      method: 'POST',
+      body: JSON.stringify({ cards: cachedConfig }),
+    });
+  } catch (err) {
+    console.error('[Charts] Failed to save config:', err);
+  }
+  // Destroy and rebuild
+  for (const id of Object.keys(chartInstances)) {
+    try { chartInstances[id].destroy(); } catch (e) { /* ignore */ }
+    delete chartInstances[id];
+  }
+  if (lazyObserver) {
+    lazyObserver.disconnect();
+    lazyObserver = null;
+  }
+  renderedCardIds.clear();
+  cardElements = {};
+  renderActive = false;
+  pendingRender = null;
+  const grid = document.getElementById('chartGrid');
+  if (grid) grid.innerHTML = '';
+  doRender(lastFilters);
 }
 
 function applyCanvasHeight(canvas, card) {

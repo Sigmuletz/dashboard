@@ -7,6 +7,7 @@ import { initTable } from './table.js';
 import { initColumns } from './columns.js';
 import { initNotifications } from './notifications.js';
 import { initCharts } from './charts.js';
+import { initViews } from './views.js';
 
 // ----- EventBus -----
 class EventBus {
@@ -52,6 +53,10 @@ export function setDataset(name) {
 // ----- Utilities -----
 export async function apiFetch(path, params = {}) {
   // Auto-append dataset to all API calls
+  const isPost = params.method === 'POST';
+  const body = params.body;
+  delete params.method;
+  delete params.body;
   params = { dataset: currentDataset, ...params };
 
   const qs = Object.entries(params)
@@ -62,7 +67,13 @@ export async function apiFetch(path, params = {}) {
     })
     .join('&');
   const url = qs ? `${path}?${qs}` : path;
-  const res = await fetch(url);
+  const options = {};
+  if (isPost) {
+    options.method = 'POST';
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = body;
+  }
+  const res = await fetch(url, options);
   if (!res.ok) throw new Error(`API ${path} returned ${res.status}`);
   return res.json();
 }
@@ -180,6 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCharts();
   initTable();
   initNotifications();
+  initViews();
 
   await initColumns();
   await initFilters();

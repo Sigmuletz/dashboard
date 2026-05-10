@@ -1,49 +1,68 @@
 {
   "cards": [
     {
-      "id": "request-counts",
-      "title": "Requests Overview",
-      "type": "number",
-      "numbers": [
-        {"label": "Total", "filter": {}},
-        {"label": "Open", "filter": {"Status": "Open"}},
-        {"label": "In Progress", "filter": {"Status": "In Progress"}},
-        {"label": "Resolved", "filter": {"Status": "Resolved"}}
-      ]
-    },
-    {
+      "groupBy": "Status",
       "id": "request-status-doughnut",
       "title": "Requests by Status",
-      "type": "doughnut",
-      "groupBy": "Status"
+      "type": "doughnut"
     },
     {
+      "color": "#34d399",
+      "groupBy": "Category",
       "id": "request-category-bar",
       "title": "Requests by Category",
-      "type": "bar",
-      "groupBy": "Category",
-      "color": "#34d399"
+      "type": "bar"
     },
     {
+      "groupBy": "Channel",
       "id": "request-channel-pie",
       "title": "Intake Channel",
-      "type": "pie",
-      "groupBy": "Channel"
+      "type": "pie"
     },
     {
+      "id": "request-counts",
+      "numbers": [
+        {
+          "filter": {},
+          "label": "Total"
+        },
+        {
+          "filter": {
+            "Status": "Open"
+          },
+          "label": "Open"
+        },
+        {
+          "filter": {
+            "Status": "In Progress"
+          },
+          "label": "In Progress"
+        },
+        {
+          "filter": {
+            "Status": "Resolved"
+          },
+          "label": "Resolved"
+        }
+      ],
+      "title": "Requests Overview",
+      "type": "number",
+      "width": 1
+    },
+    {
+      "color": "#f59e0b",
+      "groupBy": "Priority",
       "id": "request-priority-radar",
       "title": "Priority Distribution",
-      "type": "radar",
-      "groupBy": "Priority",
-      "color": "#f59e0b"
+      "type": "radar"
     },
     {
+      "chartHeight": 200,
+      "color": "#10b981",
+      "groupBy": "Created Date",
       "id": "request-timeline",
       "title": "Requests Created Over Time",
-      "type": "line",
-      "groupBy": "Created Date",
-      "color": "#10b981",
-      "chartHeight": 200
+      "type": "line"
     }
   ]
 }

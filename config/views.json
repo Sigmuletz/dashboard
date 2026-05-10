@@ -1,0 +1,145 @@
+{
+  "views": [
+    {
+      "name": "Kay",
+      "state": {
+        "dataset": "incidents",
+        "columns": "{\"visible\":[\"Number\",\"Group\",\"Responsible\",\"Description\",\"Status\",\"Priority\",\"Due Date\",\"Creation Date\"],\"order\":[\"Number\",\"CostCenter\",\"Group\",\"Responsible\",\"Description\",\"Status\",\"Priority\",\"Due Date\",\"Creation Date\"]}",
+        "filters": "{\"CostCenter\":[],\"Description\":[],\"Group\":[],\"Priority\":[],\"Responsible\":[\"Kai Schneider\"],\"Status\":[\"In Progress\",\"New\"]}",
+        "cardConfig": [
+          {
+            "id": "incident-counts",
+            "numbers": [
+              {
+                "color": "#6366f1",
+                "label": "Total"
+              },
+              {
+                "color": "#f59e0b",
+                "filter": {
+                  "Status": [
+                    "New",
+                    "In Progress",
+                    "Waiting for Info"
+                  ]
+                },
+                "label": "Open"
+              },
+              {
+                "color": "#ef4444",
+                "filter": {
+                  "Status": [
+                    "New",
+                    "In Progress",
+                    "Waiting for Info"
+                  ],
+                  "overdue": true
+                },
+                "label": "Overdue"
+              }
+            ],
+            "title": "Incidents",
+            "type": "number"
+          },
+          {
+            "color": "#ef4444",
+            "filter": {
+              "Status": [
+                "New",
+                "In Progress",
+                "Waiting for Info"
+              ],
+              "overdue": true
+            },
+            "gaugeMax": 30,
+            "id": "overdue-gauge",
+            "title": "Overdue",
+            "type": "gauge"
+          },
+          {
+            "groupBy": "Status",
+            "id": "status-bar",
+            "title": "Incidents by Status",
+            "type": "bar"
+          },
+          {
+            "color": "#8b5cf6",
+            "groupBy": "Responsible",
+            "id": "user-bar",
+            "title": "Incidents by User",
+            "type": "horizontalBar"
+          },
+          {
+            "groupBy": "Status",
+            "id": "status-priority-stacked",
+            "stackBy": "Priority",
+            "title": "Incidents by Status & Priority",
+            "type": "stackedBar"
+          },
+          {
+            "groupBy": "Priority",
+            "id": "priority-doughnut",
+            "title": "By Priority",
+            "type": "doughnut"
+          },
+          {
+            "groupBy": "Status",
+            "id": "status-pie",
+            "title": "Status Distribution",
+            "type": "pie"
+          },
+          {
+            "groupBy": "Group",
+            "id": "group-polar",
+            "title": "By Group (Polar)",
+            "type": "polarArea",
+            "width": 1
+          },
+          {
+            "color": "#f59e0b",
+            "groupBy": "Priority",
+            "id": "priority-radar",
+            "title": "Priority Radar",
+            "type": "radar"
+          },
+          {
+            "color": "#f59e0b",
+            "groupBy": "Responsible",
+            "id": "priority-radar2",
+            "title": "User Radar",
+            "type": "radar"
+          },
+          {
+            "chartHeight": 350,
+            "color": "#10b981",
+            "dateField": "Creation Date",
+            "groupBy": "Creation Date",
+            "id": "created-timeline",
+            "title": "Created Over Time (Area)",
+            "type": "area",
+            "width": 3
+          },
+          {
+            "chartHeight": 350,
+            "dateField": "Creation Date",
+            "groupBy": "Priority",
+            "id": "priority-scatter",
+            "title": "Incidents Over Time by Priority",
+            "type": "scatter",
+            "width": 4
+          },
+          {
+            "chartHeight": 350,
+            "groupBy": "Group",
+            "id": "group-bubble",
+            "title": "Activity Bubble (Group \u00d7 Priority \u00d7 Volume)",
+            "type": "bubble",
+            "width": 4
+          }
+        ]
+      },
+      "created": "2026-05-11T00:49:26.206918",
+      "updated": "2026-05-11T00:49:26.206927"
+    }
+  ]
+}

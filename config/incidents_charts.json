@@ -2,104 +2,132 @@
   "cards": [
     {
       "id": "incident-counts",
-      "type": "number",
-      "title": "Incidents",
       "numbers": [
-        { "label": "Total", "color": "#6366f1" },
-        { "label": "Open", "color": "#f59e0b", "filter": { "Status": ["New", "In Progress", "Waiting for Info"] } },
-        { "label": "Overdue", "color": "#ef4444", "filter": { "Status": ["New", "In Progress", "Waiting for Info"], "overdue": true } }
-      ]
+        {
+          "color": "#6366f1",
+          "label": "Total"
+        },
+        {
+          "color": "#f59e0b",
+          "filter": {
+            "Status": [
+              "New",
+              "In Progress",
+              "Waiting for Info"
+            ]
+          },
+          "label": "Open"
+        },
+        {
+          "color": "#ef4444",
+          "filter": {
+            "Status": [
+              "New",
+              "In Progress",
+              "Waiting for Info"
+            ],
+            "overdue": true
+          },
+          "label": "Overdue"
+        }
+      ],
+      "title": "Incidents",
+      "type": "number"
     },
     {
-      "id": "overdue-gauge",
-      "type": "gauge",
-      "title": "Overdue",
+      "color": "#ef4444",
       "filter": {
-        "Status": ["New", "In Progress", "Waiting for Info"],
+        "Status": [
+          "New",
+          "In Progress",
+          "Waiting for Info"
+        ],
         "overdue": true
       },
-      "color": "#ef4444",
-      "gaugeMax": 30
+      "gaugeMax": 30,
+      "id": "overdue-gauge",
+      "title": "Overdue",
+      "type": "gauge"
     },
     {
-      "id": "status-bar",
-      "type": "bar",
-      "title": "Incidents by Status",
-      "groupBy": "Status"
-    },
-    {
-      "id": "user-bar",
-      "type": "horizontalBar",
-      "title": "Incidents by User",
-      "groupBy": "Responsible",
-      "color": "#8b5cf6"
-    },
-    {
-      "id": "status-priority-stacked",
-      "type": "stackedBar",
-      "title": "Incidents by Status & Priority",
       "groupBy": "Status",
-      "stackBy": "Priority"
+      "id": "status-bar",
+      "title": "Incidents by Status",
+      "type": "bar"
     },
     {
+      "color": "#8b5cf6",
+      "groupBy": "Responsible",
+      "id": "user-bar",
+      "title": "Incidents by User",
+      "type": "horizontalBar"
+    },
+    {
+      "groupBy": "Status",
+      "id": "status-priority-stacked",
+      "stackBy": "Priority",
+      "title": "Incidents by Status & Priority",
+      "type": "stackedBar"
+    },
+    {
+      "groupBy": "Priority",
       "id": "priority-doughnut",
-      "type": "doughnut",
       "title": "By Priority",
-      "groupBy": "Priority"
+      "type": "doughnut"
     },
     {
+      "groupBy": "Status",
       "id": "status-pie",
-      "type": "pie",
       "title": "Status Distribution",
-      "groupBy": "Status"
+      "type": "pie"
     },
     {
-      "id": "group-polar",
-      "type": "polarArea",
-      "title": "By Group (Polar)",
       "groupBy": "Group",
+      "id": "group-polar",
+      "title": "By Group (Polar)",
+      "type": "polarArea",
       "width": 1
     },
     {
-      "id": "priority-radar",
-      "type": "radar",
-      "title": "Priority Radar",
+      "color": "#f59e0b",
       "groupBy": "Priority",
-      "color": "#f59e0b"
+      "id": "priority-radar",
+      "title": "Priority Radar",
+      "type": "radar"
     },
     {
-      "id": "priority-radar2",
-      "type": "radar",
-      "title": "User Radar",
+      "color": "#f59e0b",
       "groupBy": "Responsible",
-      "color": "#f59e0b"
-    },    
+      "id": "priority-radar2",
+      "title": "User Radar",
+      "type": "radar"
+    },
     {
-      "id": "created-timeline",
-      "type": "area",
-      "title": "Created Over Time (Area)",
+      "chartHeight": 350,
+      "color": "#10b981",
       "dateField": "Creation Date",
       "groupBy": "Creation Date",
-      "width": 3,
+      "id": "created-timeline",
+      "title": "Created Over Time (Area)",
+      "type": "area",
+      "width": 2
+    },
+    {
       "chartHeight": 350,
-      "color": "#10b981"
-    },
-    {
-      "id": "priority-scatter",
-      "type": "scatter",
-      "title": "Incidents Over Time by Priority",
-      "groupBy": "Priority",
       "dateField": "Creation Date",
-      "width": 4,
-      "chartHeight": 350
+      "groupBy": "Priority",
+      "id": "priority-scatter",
+      "title": "Incidents Over Time by Priority",
+      "type": "scatter",
+      "width": 2
     },
     {
-      "id": "group-bubble",
-      "type": "bubble",
-      "title": "Activity Bubble (Group × Priority × Volume)",
+      "chartHeight": 350,
       "groupBy": "Group",
-      "width": 4,
-      "chartHeight": 350
+      "id": "group-bubble",
+      "title": "Activity Bubble (Group \u00d7 Priority \u00d7 Volume)",
+      "type": "bubble",
+      "width": 2
     }
   ]
 }

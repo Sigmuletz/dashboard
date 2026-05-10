@@ -3,7 +3,9 @@ API blueprint — serves incidents, filter options, column metadata, charts.
 All endpoints accept ?dataset=<name> to switch between data sources.
 """
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
+import json
+import os
 from typing import Optional
 
 from flask import Blueprint, jsonify, request
@@ -187,6 +189,107 @@ def get_notifications():
 def get_charts_config():
     _, chart_cfg = _get_loaders()
     return jsonify(chart_cfg.load())
+
+
+@api_bp.route("/charts-config", methods=["POST"])
+def save_charts_config():
+    """Save updated chart card configuration (order, width) back to JSON file."""
+    _, chart_cfg = _get_loaders()
+    data = request.get_json(silent=True) or {}
+    cards = data.get("cards")
+    if not isinstance(cards, list):
+        return jsonify({"error": "Expected {cards: [...]}"}), 400
+    try:
+        chart_cfg.save(cards)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/reload", methods=["POST"])
+def reload_data():
+    """Reload all CSV data. Called by file watcher or frontend refresh button."""
+    reloaded = []
+    for ds_id, (dl, _) in loaders.items():
+        dl.reload()
+        reloaded.append(ds_id)
+    return jsonify({"ok": True, "reloaded": reloaded})
+
+
+@api_bp.route("/views")
+def get_views():
+    """List all saved dashboard views."""
+    config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config")
+    views_path = os.path.join(config_dir, "views.json")
+    try:
+        with open(views_path) as f:
+            data = json.load(f)
+        return jsonify(data.get("views", []))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify([])
+
+
+@api_bp.route("/views", methods=["POST"])
+def save_view():
+    """Save a named dashboard view. Body: {name, state}"""
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    state = data.get("state")
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    if not isinstance(state, dict):
+        return jsonify({"error": "state must be an object"}), 400
+
+    config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config")
+    views_path = os.path.join(config_dir, "views.json")
+    try:
+        with open(views_path) as f:
+            all_views = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        all_views = {"views": []}
+
+    # Upsert: replace if name exists, otherwise append
+    existing = next((v for v in all_views["views"] if v["name"] == name), None)
+    if existing:
+        existing["state"] = state
+        existing["updated"] = datetime.now().isoformat()
+    else:
+        all_views["views"].append({
+            "name": name,
+            "state": state,
+            "created": datetime.now().isoformat(),
+            "updated": datetime.now().isoformat(),
+        })
+
+    with open(views_path, 'w') as f:
+        json.dump(all_views, f, indent=2)
+    return jsonify({"ok": True, "name": name})
+
+
+@api_bp.route("/views/delete", methods=["POST"])
+def delete_view():
+    """Delete a named dashboard view. Body: {name}"""
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+
+    config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config")
+    views_path = os.path.join(config_dir, "views.json")
+    try:
+        with open(views_path) as f:
+            all_views = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"ok": True})
+
+    before = len(all_views.get("views", []))
+    all_views["views"] = [v for v in all_views.get("views", []) if v["name"] != name]
+    if len(all_views["views"]) == before:
+        return jsonify({"error": "view not found"}), 404
+
+    with open(views_path, 'w') as f:
+        json.dump(all_views, f, indent=2)
+    return jsonify({"ok": True, "name": name})
 
 
 @api_bp.route("/chart-data/<card_id>")

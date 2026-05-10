@@ -2,49 +2,68 @@
   "cards": [
     {
       "id": "change-counts",
+      "numbers": [
+        {
+          "filter": {},
+          "label": "Total"
+        },
+        {
+          "filter": {
+            "Status": "Pending Approval"
+          },
+          "label": "Pending"
+        },
+        {
+          "filter": {
+            "Status": "In Progress"
+          },
+          "label": "In Progress"
+        },
+        {
+          "filter": {
+            "Status": "Completed,Normal"
+          },
+          "label": "Completed"
+        }
+      ],
       "title": "Changes Overview",
       "type": "number",
-      "numbers": [
-        {"label": "Total", "filter": {}},
-        {"label": "Pending", "filter": {"Status": "Pending Approval"}},
-        {"label": "In Progress", "filter": {"Status": "In Progress"}},
-        {"label": "Completed", "filter": {"Status": "Completed,Normal"}}
-      ]
+      "width": 1
     },
     {
+      "color": "#8b5cf6",
+      "groupBy": "Status",
       "id": "change-status-bar",
       "title": "Changes by Status",
-      "type": "bar",
-      "groupBy": "Status",
-      "color": "#8b5cf6"
+      "type": "bar"
     },
     {
+      "groupBy": "Type",
       "id": "change-type-pie",
       "title": "Change Type Distribution",
-      "type": "pie",
-      "groupBy": "Type"
+      "type": "pie"
     },
     {
+      "color": "#f59e0b",
+      "groupBy": "Risk",
       "id": "change-risk-polar",
       "title": "Risk Profile",
-      "type": "polarArea",
-      "groupBy": "Risk",
-      "color": "#f59e0b"
+      "type": "polarArea"
     },
     {
+      "color": "#10b981",
+      "groupBy": "Team",
       "id": "change-team-bar",
       "title": "Changes by Team",
-      "type": "horizontalBar",
-      "groupBy": "Team",
-      "color": "#10b981"
+      "type": "horizontalBar"
     },
     {
+      "chartHeight": 200,
+      "color": "#6366f1",
+      "groupBy": "Submitted Date",
       "id": "change-timeline",
       "title": "Changes Submitted Over Time",
-      "type": "area",
-      "groupBy": "Submitted Date",
-      "color": "#6366f1",
-      "chartHeight": 200
+      "type": "area"
     }
   ]
 }

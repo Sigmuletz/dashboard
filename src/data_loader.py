@@ -133,3 +133,9 @@ class ChartConfigLoader:
         if not self._config:
             self.load()
         return self._config.get("cards", [])
+
+    def save(self, cards: list[dict]) -> None:
+        """Persist updated card config back to the JSON file."""
+        self._config["cards"] = cards
+        with open(self._path, 'w') as f:
+            json.dump(self._config, f, indent=2)

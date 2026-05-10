@@ -2,11 +2,42 @@
 
 import json
 import os
+import threading
+import time
 
 from flask import Flask, render_template
 
 from src.api import api_bp, init_api
 from src.data_loader import ChartConfigLoader, DataLoader
+
+
+def _watch_csv_files(loaders, registry, base_dir):
+    """Background daemon thread: poll CSV mtimes every 2s, auto-reload on change."""
+    # Build path tracking: {csv_path: {"mtime": float, "ids": [dataset_id, ...]}}
+    path_map = {}
+    for ds in registry["datasets"]:
+        csv_path = os.path.join(base_dir, ds["csv"])
+        try:
+            mtime = os.path.getmtime(csv_path)
+        except OSError:
+            mtime = 0
+        if csv_path not in path_map:
+            path_map[csv_path] = {"mtime": mtime, "ids": []}
+        path_map[csv_path]["ids"].append(ds["id"])
+
+    while True:
+        time.sleep(2)
+        for csv_path, info in path_map.items():
+            try:
+                new_mtime = os.path.getmtime(csv_path)
+            except OSError:
+                continue
+            if new_mtime > info["mtime"]:
+                info["mtime"] = new_mtime
+                for ds_id in info["ids"]:
+                    if ds_id in loaders:
+                        loaders[ds_id][0].reload()
+                print(f"[Watcher] Reloaded {len(info['ids'])} dataset(s) from {os.path.basename(csv_path)}")
 
 
 def create_app() -> Flask:
@@ -38,6 +69,14 @@ def create_app() -> Flask:
 
     # Register blueprints
     app.register_blueprint(api_bp)
+
+    # Start background CSV file watcher
+    watcher = threading.Thread(
+        target=_watch_csv_files,
+        args=(loaders, registry, base_dir),
+        daemon=True,
+    )
+    watcher.start()
 
     @app.route("/")
     def index():
