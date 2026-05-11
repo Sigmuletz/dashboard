@@ -12,7 +12,6 @@ let columns = [];          // column metadata: [{key, label, type}, ...]
 let columnValues = {};     // {columnKey: [distinct values]} for filter dropdowns
 let dirty = false;
 let draggedCardIdx = null;
-let eventsReady = false;
 
 /* ── Public: init ────────────────────────────────────────────────── */
 
@@ -44,6 +43,14 @@ export function initChartEditor() {
     }
   });
 
+  // Register delegated click/change/input once globally on the card list
+  const list = panelEl.querySelector('.chart-editor-list');
+  if (list) {
+    list.addEventListener('click', handleListClick);
+    list.addEventListener('change', handleListChange);
+    list.addEventListener('input', handleListInput);
+  }
+
   // Dataset switch: close panel, reset state
   bus.on('dataset-changed', () => {
     if (panelEl.classList.contains('open')) closePanel();
@@ -51,7 +58,6 @@ export function initChartEditor() {
     columns = [];
     columnValues = {};
     dirty = false;
-    eventsReady = false;
   });
 }
 
@@ -75,15 +81,7 @@ async function openPanel() {
 
   dirty = false;
   renderCards();
-
-  // Attach delegated event listeners once per panel session
-  if (!eventsReady) {
-    const list = panelEl.querySelector('.chart-editor-list');
-    if (list) {
-      attachCardEvents(list);
-      eventsReady = true;
-    }
-  }
+  attachDragHandlers();
 
   panelEl.classList.add('open');
   overlayEl?.classList.add('open');
@@ -97,7 +95,6 @@ function closePanel() {
   document.body.style.overflow = '';
   cards = [];
   dirty = false;
-  eventsReady = false;
 }
 
 /* ── Render ──────────────────────────────────────────────────────── */
@@ -121,7 +118,7 @@ function renderCards() {
       const isGauge = card.type === 'gauge';
       const needsGroupBy = ['bar','doughnut','pie','polarArea','radar','horizontalBar','stackedBar','scatter','bubble'].includes(card.type);
       const needsStackBy = card.type === 'stackedBar';
-      const needsColor = ['number','gauge','bar','horizontalBar','line','area'].includes(card.type) || isGauge;
+      const needsColor = ['gauge','bar','horizontalBar','line','area'].includes(card.type);
       const isCanvasChart = !isNumber && !isGauge;
 
       const groupByOpts = columnNames.map(k =>
@@ -269,7 +266,10 @@ function renderNumberSubFilters(idx, card) {
           </div>
           <div class="chart-editor-number-field">
             <span class="chart-editor-number-label">Color</span>
-            <input type="text" value="${escAttr(n.color || '')}" data-action="number-color" data-idx="${idx}" data-ni="${ni}" placeholder="#6366f1" class="chart-editor-input">
+            <div class="chart-editor-color-row">
+              <input type="color" value="${escAttr(n.color || '#6366f1')}" data-action="number-color" data-idx="${idx}" data-ni="${ni}" class="chart-editor-color">
+              <input type="text" value="${escAttr(n.color || '')}" data-action="number-color" data-idx="${idx}" data-ni="${ni}" placeholder="#6366f1" class="chart-editor-input chart-editor-color-text">
+            </div>
           </div>
           <div class="chart-editor-number-field chart-editor-number-field-wide">
             <span class="chart-editor-number-label">Filter</span>
@@ -294,7 +294,7 @@ function renderCardBody(cardEl, idx) {
   const isGauge = card.type === 'gauge';
   const needsGroupBy = ['bar','doughnut','pie','polarArea','radar','horizontalBar','stackedBar','scatter','bubble'].includes(card.type);
   const needsStackBy = card.type === 'stackedBar';
-  const needsColor = ['number','gauge','bar','horizontalBar','line','area'].includes(card.type);
+  const needsColor = ['gauge','bar','horizontalBar','line','area'].includes(card.type);
   const isCanvasChart = !isNumber && !isGauge;
 
   const columnNames = columns.map(c => c.key).sort();
@@ -410,10 +410,12 @@ function filterToString(f) {
   }).join('; ');
 }
 
-/* ── Event delegation ────────────────────────────────────────────── */
+/* ── Drag handlers (re-attached after each render) ────────────────── */
 
-function attachCardEvents(list) {
-  // Drag & drop reorder
+function attachDragHandlers() {
+  const list = panelEl?.querySelector('.chart-editor-list');
+  if (!list) return;
+
   list.querySelectorAll('.chart-editor-card').forEach(cardEl => {
     cardEl.addEventListener('dragstart', (e) => {
       draggedCardIdx = parseInt(cardEl.dataset.cardIdx);
@@ -445,157 +447,177 @@ function attachCardEvents(list) {
         cards.splice(targetIdx, 0, moved);
         dirty = true;
         renderCards();
+        attachDragHandlers();
       }
       draggedCardIdx = null;
     });
   });
+}
 
-  // Delegated click handlers
-  list.addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    const action = btn.dataset.action;
-    const idx = parseInt(btn.dataset.idx);
+/* ── Delegated event handlers (registered once globally) ──────────── */
 
-    if (action === 'delete') {
-      if (confirm(`Delete chart "${cards[idx]?.title || 'untitled'}"?`)) {
-        cards.splice(idx, 1);
-        dirty = true;
-        renderCards();
-      }
-    } else if (action === 'add-filter') {
-      if (!cards[idx].filter) cards[idx].filter = {};
-      // Pick first available column as default
-      const existing = Object.keys(cards[idx].filter);
-      const available = columns.map(c => c.key).filter(k => !existing.includes(k));
-      const field = available[0] || columns[0]?.key || 'Status';
-      cards[idx].filter[field] = [];
+function handleListClick(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const idx = parseInt(btn.dataset.idx);
+
+  if (action === 'delete') {
+    if (confirm(`Delete chart "${cards[idx]?.title || 'untitled'}"?`)) {
+      cards.splice(idx, 1);
       dirty = true;
       renderCards();
-    } else if (action === 'remove-filter') {
-      const field = btn.dataset.field;
-      if (cards[idx]?.filter) {
+      attachDragHandlers();
+    }
+  } else if (action === 'add-filter') {
+    if (!cards[idx].filter) cards[idx].filter = {};
+    const existing = Object.keys(cards[idx].filter);
+    const available = columns.map(c => c.key).filter(k => !existing.includes(k));
+    const field = available[0] || columns[0]?.key || 'Status';
+    cards[idx].filter[field] = [];
+    dirty = true;
+    renderCards();
+    attachDragHandlers();
+  } else if (action === 'remove-filter') {
+    const field = btn.dataset.field;
+    if (cards[idx]?.filter) {
+      delete cards[idx].filter[field];
+      if (Object.keys(cards[idx].filter).length === 0) delete cards[idx].filter;
+      dirty = true;
+      renderCards();
+      attachDragHandlers();
+    }
+  } else if (action === 'add-number') {
+    if (!cards[idx].numbers) cards[idx].numbers = [];
+    cards[idx].numbers.push({ label: 'Count', color: '#6366f1', filter: {} });
+    dirty = true;
+    renderCards();
+    attachDragHandlers();
+  } else if (action === 'remove-number') {
+    const ni = parseInt(btn.dataset.ni);
+    cards[idx].numbers.splice(ni, 1);
+    if (cards[idx].numbers.length === 0) delete cards[idx].numbers;
+    dirty = true;
+    renderCards();
+    attachDragHandlers();
+  }
+}
+
+function handleListChange(e) {
+  const el = e.target;
+  const action = el.dataset.action;
+  const idx = parseInt(el.dataset.idx);
+
+  if (action === 'filter-field') {
+    const oldField = el.dataset.oldField;
+    const newField = el.value;
+    if (oldField && newField && oldField !== newField && cards[idx]?.filter) {
+      cards[idx].filter[newField] = cards[idx].filter[oldField];
+      delete cards[idx].filter[oldField];
+      dirty = true;
+      renderCards();
+      attachDragHandlers();
+    }
+    return;
+  }
+
+  if (action === 'filter-values') {
+    const field = el.dataset.field;
+    const raw = el.value.trim();
+    if (cards[idx]?.filter) {
+      if (raw === 'true' || raw === 'false') {
+        cards[idx].filter[field] = raw === 'true';
+      } else if (raw) {
+        cards[idx].filter[field] = raw.split(',').map(v => v.trim()).filter(Boolean);
+      } else {
         delete cards[idx].filter[field];
         if (Object.keys(cards[idx].filter).length === 0) delete cards[idx].filter;
-        dirty = true;
-        renderCards();
       }
-    } else if (action === 'add-number') {
-      if (!cards[idx].numbers) cards[idx].numbers = [];
-      cards[idx].numbers.push({ label: 'Count', color: '#6366f1', filter: {} });
       dirty = true;
-      renderCards();
-    } else if (action === 'remove-number') {
-      const ni = parseInt(btn.dataset.ni);
-      cards[idx].numbers.splice(ni, 1);
-      if (cards[idx].numbers.length === 0) delete cards[idx].numbers;
+    }
+    return;
+  }
+
+  if (action === 'number-label') {
+    const ni = parseInt(el.dataset.ni);
+    if (cards[idx]?.numbers?.[ni]) {
+      cards[idx].numbers[ni].label = el.value;
       dirty = true;
-      renderCards();
     }
-  });
+    return;
+  }
+  if (action === 'number-color') {
+    const ni = parseInt(el.dataset.ni);
+    if (cards[idx]?.numbers?.[ni]) {
+      cards[idx].numbers[ni].color = el.value;
+      dirty = true;
+    }
+    return;
+  }
+  if (action === 'number-filter') {
+    const ni = parseInt(el.dataset.ni);
+    const raw = el.value.trim();
+    if (cards[idx]?.numbers?.[ni]) {
+      cards[idx].numbers[ni].filter = parseFilterString(raw);
+      dirty = true;
+    }
+    return;
+  }
+}
 
-  // Delegated change handlers (inputs, selects)
-  list.addEventListener('change', (e) => {
-    const el = e.target;
-    const action = el.dataset.action;
+function handleListInput(e) {
+  const el = e.target;
+
+  // Sync number color picker ↔ text
+  if (el.dataset.action === 'number-color') {
     const idx = parseInt(el.dataset.idx);
-
-    if (action === 'filter-field') {
-      // Rename filter key
-      const oldField = el.dataset.oldField;
-      const newField = el.value;
-      if (oldField && newField && oldField !== newField && cards[idx]?.filter) {
-        cards[idx].filter[newField] = cards[idx].filter[oldField];
-        delete cards[idx].filter[oldField];
-        dirty = true;
-        renderCards(); // need full re-render to update data-old-field
-      }
-      return;
+    const ni = parseInt(el.dataset.ni);
+    if (el.type === 'color') {
+      const textInput = el.parentElement?.querySelector('.chart-editor-color-text');
+      if (textInput) textInput.value = el.value;
+    } else {
+      const colorInput = el.parentElement?.querySelector('.chart-editor-color');
+      if (colorInput) colorInput.value = el.value;
     }
-
-    if (action === 'filter-values') {
-      const field = el.dataset.field;
-      const raw = el.value.trim();
-      if (cards[idx]?.filter) {
-        if (raw === 'true' || raw === 'false') {
-          cards[idx].filter[field] = raw === 'true';
-        } else if (raw) {
-          cards[idx].filter[field] = raw.split(',').map(v => v.trim()).filter(Boolean);
-        } else {
-          delete cards[idx].filter[field];
-          if (Object.keys(cards[idx].filter).length === 0) delete cards[idx].filter;
-        }
-        dirty = true;
-      }
-      return;
+    if (cards[idx]?.numbers?.[ni]) {
+      cards[idx].numbers[ni].color = el.value;
+      dirty = true;
     }
+    return;
+  }
 
-    // Number sub-filters
-    if (action === 'number-label') {
-      const ni = parseInt(el.dataset.ni);
-      if (cards[idx]?.numbers?.[ni]) {
-        cards[idx].numbers[ni].label = el.value;
-        dirty = true;
-      }
-      return;
+  const field = el.dataset.field;
+  const idx = parseInt(el.dataset.idx);
+  if (field === undefined || isNaN(idx)) return;
+  if (!cards[idx]) return;
+
+  let val = el.value;
+
+  if (field === 'width' || field === 'chartHeight' || field === 'gaugeMax') {
+    val = val ? parseInt(val) : undefined;
+  }
+  if (field === 'width') {
+    val = Math.max(1, Math.min(4, val || 1));
+  }
+
+  if (field === 'color') {
+    if (el.type === 'color') {
+      const textInput = el.parentElement?.querySelector('.chart-editor-color-text');
+      if (textInput) textInput.value = val;
+    } else {
+      const colorInput = el.parentElement?.querySelector('.chart-editor-color');
+      if (colorInput) colorInput.value = val;
     }
-    if (action === 'number-color') {
-      const ni = parseInt(el.dataset.ni);
-      if (cards[idx]?.numbers?.[ni]) {
-        cards[idx].numbers[ni].color = el.value;
-        dirty = true;
-      }
-      return;
-    }
-    if (action === 'number-filter') {
-      const ni = parseInt(el.dataset.ni);
-      const raw = el.value.trim();
-      if (cards[idx]?.numbers?.[ni]) {
-        cards[idx].numbers[ni].filter = parseFilterString(raw);
-        dirty = true;
-      }
-      return;
-    }
+  }
 
-  });
+  cards[idx][field] = val;
+  dirty = true;
 
-  // Delegated input handlers for text fields
-  list.addEventListener('input', (e) => {
-    const el = e.target;
-    const field = el.dataset.field;
-    const idx = parseInt(el.dataset.idx);
-    if (field === undefined || isNaN(idx)) return;
-    if (!cards[idx]) return;
-
-    let val = el.value;
-
-    if (field === 'width' || field === 'chartHeight' || field === 'gaugeMax') {
-      val = val ? parseInt(val) : undefined;
-    }
-    if (field === 'width') {
-      val = Math.max(1, Math.min(4, val || 1));
-    }
-
-    if (field === 'color') {
-      // Sync color input with text and vice versa
-      if (el.type === 'color') {
-        const textInput = el.parentElement?.querySelector('.chart-editor-color-text');
-        if (textInput) textInput.value = val;
-      } else {
-        const colorInput = el.parentElement?.querySelector('.chart-editor-color');
-        if (colorInput) colorInput.value = val;
-      }
-    }
-
-    cards[idx][field] = val;
-    dirty = true;
-
-    // Type change → re-render card body to show/hide type-specific fields
-    if (field === 'type') {
-      const cardEl = list.querySelector(`.chart-editor-card[data-card-idx="${idx}"]`);
-      if (cardEl) renderCardBody(cardEl, idx);
-    }
-  });
+  if (field === 'type') {
+    const list = panelEl?.querySelector('.chart-editor-list');
+    const cardEl = list?.querySelector(`.chart-editor-card[data-card-idx="${idx}"]`);
+    if (cardEl) renderCardBody(cardEl, idx);
+  }
 }
 
 function parseFilterString(raw) {

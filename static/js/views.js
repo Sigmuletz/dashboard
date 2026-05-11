@@ -20,6 +20,7 @@ async function captureState() {
     ['filters', `dashboard-filters-${dataset}`],
     ['sort', `dashboard-sort-${dataset}`],
     ['search', `dashboard-search-${dataset}`],
+    ['notifFields', `dashboard-notif-fields-${dataset}`],
   ];
   for (const [field, key] of keys) {
     const raw = localStorage.getItem(key);
@@ -46,6 +47,7 @@ async function applyView(view) {
   if (s.filters) localStorage.setItem(`dashboard-filters-${s.dataset}`, s.filters);
   if (s.sort) localStorage.setItem(`dashboard-sort-${s.dataset}`, s.sort);
   if (s.search) localStorage.setItem(`dashboard-search-${s.dataset}`, s.search);
+  if (s.notifFields) localStorage.setItem(`dashboard-notif-fields-${s.dataset}`, s.notifFields);
 
   // Save card config to the view's own dataset (bypass apiFetch so we
   // control the dataset param directly, not the current one)

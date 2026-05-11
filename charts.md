@@ -1,10 +1,47 @@
-# Chart Types Reference
+# Dashboard Reference
 
-Dashboard uses **Chart.js** (loaded via CDN `window.Chart`). All chart cards are configured in `config/charts.json`.
+## Architecture Overview
+
+```
+app.py          — Flask server, dataset registry, static serving
+src/
+  api.py        — All REST endpoints (columns, data, charts, notifications, views, highlighting)
+  data_loader.py— CSV parsing + per-dataset config file loading
+  models.py     — Date parsing, overdue detection, column type guessing
+config/
+  {dataset}_charts.json       — Per-dataset chart card definitions
+  {dataset}_highlighting.json — Per-dataset row/cell highlighting rules
+  views.json                  — Saved dashboard presets (full state snapshots)
+static/js/
+  app.js          — EventBus, shared utilities, dataset switcher
+  charts.js       — Chart rendering (Chart.js), chart card grid
+  chart-editor.js — Chart configuration panel (add/remove/reorder cards)
+  table.js        — Data table rendering, sorting, search
+  columns.js      — Column visibility picker for the table
+  filters.js      — Left sidebar filter panel
+  notifications.js— Right sidebar notification cards with field mapping
+  views.js        — Save/apply/delete dashboard view presets
+  highlighting-editor.js — Row/cell highlighting rule editor
+templates/
+  index.html      — Single-page layout (header, sidebar, main, notifications)
+```
+
+---
+
+## Data Flow
+
+1. **CSV files** in `data/` (e.g. `incidents.csv`, `requests.csv`, `changes.csv`) are loaded by `data_loader.py`
+2. **Config JSON files** in `config/` are loaded per-dataset:
+   - `{dataset}_charts.json` — chart card definitions
+   - `{dataset}_highlighting.json` — highlighting rules
+3. **REST API** (`src/api.py`) serves filtered/sorted data as JSON
+4. **Frontend** fetches data via `apiFetch()` and renders with Chart.js + vanilla DOM
 
 ---
 
 ## Supported Chart Types
+
+Dashboard uses **Chart.js** (loaded via CDN `window.Chart`). Chart cards are configured in `config/{dataset}_charts.json`.
 
 ### 1. `number` — KPI Card
 Large number + label. No canvas.
@@ -55,7 +92,7 @@ One bar per category. Best for comparing discrete groups.
 | Config field | Required | Description |
 |-------------|----------|-------------|
 | `title` | yes | Card heading |
-| `groupBy` | yes | Incident field to group by |
+| `groupBy` | yes | Field to group by |
 | `color` | no | Bar color (default `#6366f1`) |
 | `width` | no | `2` for double-width card |
 
@@ -71,12 +108,12 @@ One bar per category. Best for comparing discrete groups.
 ---
 
 ### 4. `horizontalBar` — Horizontal Bar Chart
-Same as `bar` but with `indexAxis: 'y'`. Better for long category labels or ranking.
+Same as `bar` but with `indexAxis: 'y'`. Better for long category labels.
 
 | Config field | Required | Description |
 |-------------|----------|-------------|
 | `title` | yes | Card heading |
-| `groupBy` | yes | Incident field to group by |
+| `groupBy` | yes | Field to group by |
 | `color` | no | Bar color |
 
 ```json
@@ -121,8 +158,7 @@ Ring chart with center cutout. Good for part-to-whole.
 | Config field | Required | Description |
 |-------------|----------|-------------|
 | `title` | yes | Card heading |
-| `groupBy` | yes | Incident field |
-| `color` | no | Unused (palette auto-assigned) |
+| `groupBy` | yes | Field to group by |
 
 ```json
 {
@@ -141,7 +177,7 @@ Full-circle variant of doughnut (cutout = 0). Same data format.
 | Config field | Required | Description |
 |-------------|----------|-------------|
 | `title` | yes | Card heading |
-| `groupBy` | yes | Incident field |
+| `groupBy` | yes | Field to group by |
 
 ```json
 {
@@ -155,12 +191,12 @@ Full-circle variant of doughnut (cutout = 0). Same data format.
 ---
 
 ### 8. `polarArea` — Polar Area Chart
-Radial chart where each segment angle is equal, but radius varies by value. Best for comparing magnitude across a small number of categories.
+Radial chart where each segment angle is equal, but radius varies by value.
 
 | Config field | Required | Description |
 |-------------|----------|-------------|
 | `title` | yes | Card heading |
-| `groupBy` | yes | Incident field |
+| `groupBy` | yes | Field to group by |
 | `width` | no | `2` for double-width card |
 
 ```json
@@ -176,12 +212,12 @@ Radial chart where each segment angle is equal, but radius varies by value. Best
 ---
 
 ### 9. `radar` — Radar / Spider Chart
-Multi-axis comparison. Each category is an axis radiating from center. Good for profiles or multi-criteria scoring.
+Multi-axis comparison. Each category is an axis radiating from center.
 
 | Config field | Required | Description |
 |-------------|----------|-------------|
 | `title` | yes | Card heading |
-| `groupBy` | yes | Incident field |
+| `groupBy` | yes | Field to group by |
 | `color` | no | Line/fill color |
 
 ```json
@@ -197,7 +233,7 @@ Multi-axis comparison. Each category is an axis radiating from center. Good for 
 ---
 
 ### 10. `line` — Line Chart
-Time-series line with points. Uses `creation_date` for x-axis.
+Time-series line with points.
 
 | Config field | Required | Description |
 |-------------|----------|-------------|
@@ -220,7 +256,7 @@ Time-series line with points. Uses `creation_date` for x-axis.
 ---
 
 ### 11. `area` — Area Chart
-Same as `line` but with gradient fill below the curve. Visually emphasizes volume over time.
+Same as `line` but with gradient fill below the curve.
 
 | Config field | Required | Description |
 |-------------|----------|-------------|
@@ -243,7 +279,7 @@ Same as `line` but with gradient fill below the curve. Visually emphasizes volum
 ---
 
 ### 12. `scatter` — Scatter Chart
-Time-series scatter with points connected by line. One dataset per group. X = date, Y = count. Good for comparing trends across categories.
+Time-series scatter with points connected by line. One dataset per group. X = date, Y = count.
 
 | Config field | Required | Description |
 |-------------|----------|-------------|
@@ -267,7 +303,7 @@ Backend returns `{ datasets: [{ label, data: [{ x, y }], backgroundColor }] }`.
 ---
 
 ### 13. `bubble` — Bubble Chart
-Scatter with a third dimension (bubble size). X = date, Y = avg priority (1-4), radius = incident count. One dataset per group.
+Scatter with a third dimension (bubble size). X = date, Y = avg priority (1-4), radius = count.
 
 | Config field | Required | Description |
 |-------------|----------|-------------|
@@ -289,7 +325,7 @@ Backend returns `{ datasets: [{ label, data: [{ x, y, r }], backgroundColor }] }
 
 ---
 
-## Config Reference
+## Chart Config Reference
 
 ### Common Fields (all types)
 
@@ -302,11 +338,6 @@ Backend returns `{ datasets: [{ label, data: [{ x, y, r }], backgroundColor }] }
 | `width` | number | Column span in grid (`1` = default, `4` = full row in 4-col grid) |
 | `chartHeight` | number | Canvas height in pixels. When set, chart fills exact height. When omitted, Chart.js auto-sizes with aspect ratio. |
 | `color` | string | Hex color for monochrome charts (`number`, `gauge`, `bar`, `line`, `area`, `radar`) |
-
-### Groupable Fields
-Valid `groupBy` / `stackBy` values (match CSV columns):
-- `Status`, `Priority`, `Group`, `Responsible`
-- `Creation Date`, `Due Date`
 
 ### Palette
 Auto-assigned palette (16 colors, cycles):
@@ -321,10 +352,94 @@ Auto-assigned palette (16 colors, cycles):
 
 ---
 
+## Chart Editor UI
+
+Accessed via the **Charts** button in the header toolbar. Opens a slide-out panel that allows:
+
+- **Add Chart** — Create a new chart card with type, title, groupBy, color, width, filter
+- **Remove Chart** — Delete a card (× button on each card row)
+- **Reorder** — Drag cards to change display order (persisted on save)
+- **Save & Apply** — Writes updated config to `config/{dataset}_charts.json` via `POST /api/charts-config`
+
+Changes take effect immediately after save — no page reload needed.
+
+---
+
+## Notification System
+
+The right sidebar shows a configurable list of recent items (up to 50).
+
+### Notification Card Layout
+Each card displays exactly **5 fields**:
+
+| Field | Description | Default column source |
+|-------|-------------|----------------------|
+| **Ticket ID** | Item identifier | Auto-detected: `Number`, `ID`, `Ref`, `Ticket` |
+| **Priority** | Priority badge | Auto-detected: column containing "priority"/"severity"/"urgency" |
+| **Description** | Description text (2-line clamp) | Auto-detected: `Description`, `Title`, `Subject`, `Summary` |
+| **Status** | Status badge with dot | Auto-detected: column containing "status"/"state"/"phase" |
+| **Age** | Relative time (e.g. "2h ago") | Auto-detected: `Creation Date`, `Created Date`, `Submitted Date` |
+
+### Field Mapping
+Each of the 5 fields can be manually mapped to a specific CSV column via the **gear icon** (⚙) button in the notification config bar. The popup shows 5 dropdowns, each with:
+
+- **Auto** — Server auto-detection heuristics (default)
+- **Any column name** — Explicit column mapping
+
+Mappings are persisted per dataset in `localStorage` key `dashboard-notif-fields-{dataset}` and are included in saved **Views** (presets).
+
+### Sort & Limit
+- **Sort column** — Dropdown of all columns, default "Auto (date)" uses server's date-column detection
+- **Sort direction** — Ascending/descending toggle button
+- **Limit** — 5, 10, 20, or 50 items
+- These settings are in-memory only (reset on reload), not persisted
+
+---
+
+## Views / Presets
+
+The **Views** dropdown in the header saves and restores complete dashboard state:
+
+**Captured state:**
+- Current dataset
+- Table column visibility & order (`dashboard-columns-{dataset}`)
+- Active filters (`dashboard-filters-{dataset}`)
+- Table sort (`dashboard-sort-{dataset}`)
+- Search text (`dashboard-search-{dataset}`)
+- Notification field mapping (`dashboard-notif-fields-{dataset}`)
+- Chart card configuration (from `config/{dataset}_charts.json`)
+
+Views are stored server-side in `config/views.json`. Applying a view writes all localStorage keys, saves chart config, switches dataset, and reloads the page.
+
+---
+
+## Highlighting Rules
+
+Per-dataset row and cell highlighting rules configured via the **Styles** button in the table toolbar. Rules are stored in `config/{dataset}_highlighting.json`.
+
+Each rule specifies:
+- **Target** — `row` (entire row background) or `cell` (specific column)
+- **Column** — For cell rules, which column to highlight
+- **Condition** — Column + operator + value (e.g. `Status = "Overdue"`, `Priority > "Medium"`)
+- **Style** — Background color, text color, font weight
+
+---
+
+## Adding a New Dataset
+
+1. Add CSV file to `data/` (e.g. `newdata.csv`)
+2. Create chart config: `config/newdata_charts.json` (can be empty array `[]`)
+3. Create highlighting config: `config/newdata_highlighting.json` (can be empty object `{}`)
+4. Register in `app.py`'s `DATASETS` dict
+5. Dataset appears in the header dropdown automatically
+
+---
+
 ## Adding a New Chart Type
 
-1. **Backend** (`src/api.py`): Add handler in `get_chart_data()` route — process incidents, return JSON.
-2. **Frontend** (`static/js/charts.js`): Add `renderXxxChart()` function + case in `doRender()` switch.
-3. **Config** (`config/charts.json`): Add card entry with `type` matching the new type string.
+1. **Backend** (`src/api.py`): Add handler in `get_chart_data()` route — process rows, return JSON
+2. **Frontend** (`static/js/charts.js`): Add `renderXxxChart()` function + case in `doRender()` switch
+3. **Config** (`config/{dataset}_charts.json`): Add card entry with `type` matching the new type string
+4. **Chart Editor** (`static/js/chart-editor.js`): Add the new type to the type dropdown if it needs custom fields
 
 No other files need changes.

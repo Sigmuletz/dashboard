@@ -1,7 +1,13 @@
 /**
  * notifications.js — Right sidebar showing recent activity.
- * Supports user-configurable sort column, direction, limit, and
- * selectable display columns (persisted in localStorage per dataset).
+ *
+ * Displays exactly 5 fields per item: ticket-id, priority, description,
+ * status, and age.  Each field is configurable — the user can map it to
+ * any CSV column (or keep the "Auto" default which uses server-provided
+ * computed keys like _id, _description, _date).
+ *
+ * Sort column, direction, limit, and field mappings are persisted per
+ * dataset in localStorage.
  */
 import { bus, apiFetch, relativeTime, statusClass, priorityClass, getDataset } from './app.js';
 
@@ -11,44 +17,156 @@ let sortOrder = 'desc';
 let limit = 10;
 let allColumns = [];    // all column metadata from API
 
-// Default visible columns per dataset — key field names that look good in a card
-const DEFAULT_VISIBLE = ['Number','ID','Status','Priority','Description','Title','Subject','Summary'];
-const STORAGE_KEY_PREFIX = 'dashboard-notif-cols-';
+/* ------------------------------------------------------------------ */
+/*  Field-mapping storage (per dataset)                               */
+/* ------------------------------------------------------------------ */
+
+const FIELD_KEYS = ['ticketId', 'priority', 'description', 'status', 'age'];
+const FIELD_LABELS = { ticketId: 'Ticket ID', priority: 'Priority', description: 'Description', status: 'Status', age: 'Age' };
+const STORAGE_KEY_PREFIX = 'dashboard-notif-fields-';
 
 function storageKey() { return STORAGE_KEY_PREFIX + getDataset(); }
 
-function loadVisibleColumns() {
+/** Default mapping: all "auto" (use server _id/_description/_date or column heuristics). */
+function defaultMapping() {
+  return { ticketId: 'auto', priority: 'auto', description: 'auto', status: 'auto', age: 'auto' };
+}
+
+function loadFieldMapping() {
   try {
     const raw = localStorage.getItem(storageKey());
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // Validate keys
+      const valid = {};
+      for (const k of FIELD_KEYS) valid[k] = FIELD_KEYS.includes(k) ? (saved[k] || 'auto') : 'auto';
+      return valid;
+    }
   } catch (e) { /* ignore */ }
   return null;
 }
 
-function saveVisibleColumns(visible) {
-  try {
-    localStorage.setItem(storageKey(), JSON.stringify(visible));
-  } catch (e) { /* ignore */ }
+function saveFieldMapping(mapping) {
+  try { localStorage.setItem(storageKey(), JSON.stringify(mapping)); } catch (e) { /* ignore */ }
 }
 
-/** Return list of column keys currently selected for display. */
-function getVisibleCols() {
-  const saved = loadVisibleColumns();
-  if (saved && saved.length > 0) {
-    // Filter against known columns
-    const known = new Set(allColumns.map(c => c.key));
-    return saved.filter(k => known.has(k));
-  }
-  // Default: pick columns whose keys match common field names
-  const defaults = allColumns
-    .filter(c => DEFAULT_VISIBLE.some(d => c.key.toLowerCase().includes(d.toLowerCase())))
-    .map(c => c.key);
-  // Add a few fallback columns if nothing matched
-  if (defaults.length === 0 && allColumns.length > 0) {
-    defaults.push(...allColumns.slice(0, 4).map(c => c.key));
-  }
-  return defaults;
+/** Return current field mapping (loaded or defaults). */
+function getFieldMapping() {
+  const saved = loadFieldMapping();
+  if (saved) return saved;
+  return defaultMapping();
 }
+
+/* ------------------------------------------------------------------ */
+/*  Resolve a field value for one notification item                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Given an item (from /api/notifications) and a field mapping entry
+ * (either "auto" or a column key), return { raw, display }.
+ *
+ * raw   — the underlying value (string or null)
+ * display — formatted HTML-safe string
+ */
+function resolveField(item, mappingVal) {
+  let val = null;
+
+  if (mappingVal === 'auto') {
+    // Use server-computed keys or column-name heuristics
+    val = item._id || item._description || item._date || null;
+  } else if (mappingVal && item[mappingVal] !== undefined) {
+    val = item[mappingVal];
+  }
+
+  if (val === null || val === undefined || val === '' || val === 'None') return { raw: null, display: '' };
+
+  return { raw: String(val), display: escHtml(String(val)) };
+}
+
+/**
+ * Fully resolve all 5 fields for an item.
+ * Uses per-field mapping so each slot can target a different column.
+ */
+function resolveAllFields(item, mapping) {
+  // ticket-id
+  let tidRaw = null, tidDisplay = '';
+  if (mapping.ticketId === 'auto') {
+    tidRaw = item._id || '';
+    tidDisplay = escHtml(tidRaw || '—');
+  } else if (mapping.ticketId && item[mapping.ticketId] !== undefined) {
+    const v = item[mapping.ticketId];
+    tidRaw = v !== null && v !== undefined ? String(v) : '';
+    tidDisplay = escHtml(tidRaw || '—');
+  } else {
+    tidDisplay = '—';
+  }
+
+  // priority
+  const priMapping = mapping.priority === 'auto' ? findAutoColumn(item, ['priority', 'severity', 'urgency']) : mapping.priority;
+  let priRaw = null, priDisplay = '';
+  if (priMapping && item[priMapping] !== undefined) {
+    priRaw = item[priMapping];
+    if (priRaw !== null && priRaw !== undefined && String(priRaw) !== '') {
+      priDisplay = `<span class="badge ${priorityClass(priRaw)}">${escHtml(String(priRaw))}</span>`;
+    }
+  }
+
+  // description
+  let descRaw = null, descDisplay = '';
+  if (mapping.description === 'auto') {
+    descRaw = item._description || '';
+    descDisplay = escHtml(descRaw);
+  } else if (mapping.description && item[mapping.description] !== undefined) {
+    const v = item[mapping.description];
+    descRaw = v !== null && v !== undefined ? String(v) : '';
+    descDisplay = escHtml(descRaw);
+  }
+
+  // status
+  const stMapping = mapping.status === 'auto' ? findAutoColumn(item, ['status', 'state', 'phase']) : mapping.status;
+  let stRaw = null, stDisplay = '';
+  if (stMapping && item[stMapping] !== undefined) {
+    stRaw = item[stMapping];
+    if (stRaw !== null && stRaw !== undefined && String(stRaw) !== '') {
+      stDisplay = `<span class="status-badge ${statusClass(stRaw)}" style="font-size:0.65rem;padding:0 0.375rem;"><span class="dot"></span>${escHtml(String(stRaw))}</span>`;
+    }
+  }
+
+  // age
+  let ageDisplay = '';
+  if (mapping.age === 'auto') {
+    ageDisplay = item._date ? relativeTime(item._date) : '';
+  } else if (mapping.age && item[mapping.age] !== undefined) {
+    const v = item[mapping.age];
+    if (v && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+      ageDisplay = relativeTime(v);
+    } else if (v) {
+      ageDisplay = escHtml(String(v));
+    }
+  }
+
+  return {
+    ticketId: { raw: tidRaw, display: tidDisplay },
+    priority: { raw: priRaw, display: priDisplay },
+    description: { raw: descRaw, display: descDisplay },
+    status: { raw: stRaw, display: stDisplay },
+    age: { raw: null, display: ageDisplay }
+  };
+}
+
+/** Find first column key in item whose name contains any of the given keywords. */
+function findAutoColumn(item, keywords) {
+  for (const key of Object.keys(item)) {
+    if (key.startsWith('_')) continue;
+    const kl = key.toLowerCase();
+    if (keywords.some(kw => kl.includes(kw))) return key;
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Initialisation                                                     */
+/* ------------------------------------------------------------------ */
 
 export function initNotifications() {
   const sortSelect = document.getElementById('notifSortCol');
@@ -56,15 +174,12 @@ export function initNotifications() {
   const limitSelect = document.getElementById('notifLimit');
 
   // Build sort column dropdown when columns are loaded
-  bus.on('columns-changed', (visibleCols) => {
-    // columns-changed gives us visible table columns — we need ALL columns
-    // Fetch all columns on first load
+  bus.on('columns-changed', () => {
     if (allColumns.length === 0) {
       apiFetch('/api/columns').then(data => {
         allColumns = data.columns || [];
         populateSortDropdown(sortSelect);
-        buildColumnsMenu();
-        // Re-render with current visible cols
+        buildFieldsMenu();
         fetchNotifications({});
       }).catch(() => {});
     }
@@ -84,59 +199,41 @@ export function initNotifications() {
   });
 
   // Limit change
-  limitSelect?.addEventListener('click', (e) => {
-    // Don't trigger on every click — handled by change
-  });
   limitSelect?.addEventListener('change', () => {
     limit = parseInt(limitSelect.value) || 10;
     fetchNotifications({});
   });
 
-  // Notif columns picker toggle
-  const colsBtn = document.getElementById('notifColumnsBtn');
-  const colsPicker = document.getElementById('notifColumnsPicker');
-  const colsMenu = document.getElementById('notifColumnsMenu');
+  // Fields mapping picker toggle (menu at body level, positioned via fixed coords)
+  const fieldsBtn = document.getElementById('notifFieldsBtn');
+  const fieldsMenu = document.getElementById('notifFieldsMenu');
 
-  colsBtn?.addEventListener('click', (e) => {
+  fieldsBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
-    colsPicker.classList.toggle('open');
+    const open = fieldsMenu.classList.toggle('open');
+    if (open) {
+      const rect = fieldsBtn.getBoundingClientRect();
+      fieldsMenu.style.top = (rect.bottom + 6) + 'px';
+      // Align right edge of menu with right edge of button
+      fieldsMenu.style.left = (rect.right - fieldsMenu.offsetWidth) + 'px';
+    }
   });
 
   document.addEventListener('click', (e) => {
-    if (colsPicker && !colsPicker.contains(e.target)) {
-      colsPicker.classList.remove('open');
+    if (fieldsMenu && !fieldsMenu.contains(e.target) && e.target !== fieldsBtn) {
+      fieldsMenu.classList.remove('open');
     }
   });
 
-  // Select All / Deselect All for notif columns
-  document.getElementById('notifColSelectAll')?.addEventListener('click', () => {
-    const visible = allColumns.map(c => c.key);
-    saveVisibleColumns(visible);
-    buildColumnsMenu();
-    fetchNotifications({});
-  });
-  document.getElementById('notifColDeselectAll')?.addEventListener('click', () => {
-    // Keep at least one
-    const visible = allColumns.length > 0 ? [allColumns[0].key] : [];
-    saveVisibleColumns(visible);
-    buildColumnsMenu();
-    fetchNotifications({});
-  });
-
-  // Delegate clicks inside notif columns menu
-  colsMenu?.addEventListener('click', (e) => {
-    const cb = e.target.closest('input[type="checkbox"]');
-    if (!cb) return;
-    const key = cb.value;
-    const visible = getVisibleCols();
-    if (cb.checked && !visible.includes(key)) {
-      visible.push(key);
-    } else if (!cb.checked && visible.length > 1) {
-      const idx = visible.indexOf(key);
-      if (idx !== -1) visible.splice(idx, 1);
-    }
-    saveVisibleColumns(visible);
-    buildColumnsMenu();
+  // Delegate changes on field-mapping selects
+  const fieldsList = document.getElementById('notifFieldsList');
+  fieldsList?.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('notif-fields-select')) return;
+    const fieldKey = e.target.dataset.field;
+    if (!fieldKey) return;
+    const mapping = getFieldMapping();
+    mapping[fieldKey] = e.target.value;
+    saveFieldMapping(mapping);
     fetchNotifications({});
   });
 
@@ -152,11 +249,10 @@ export function initNotifications() {
     if (sortSelect) sortSelect.value = '';
     if (limitSelect) limitSelect.value = '10';
     updateDirIcon(dirBtn);
-    // Re-fetch columns on dataset change
     apiFetch('/api/columns').then(data => {
       allColumns = data.columns || [];
       populateSortDropdown(sortSelect);
-      buildColumnsMenu();
+      buildFieldsMenu();
       fetchNotifications({});
     }).catch(() => {});
   });
@@ -166,6 +262,10 @@ export function initNotifications() {
     fetchNotifications({});
   }, 60000);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Sort dropdown                                                      */
+/* ------------------------------------------------------------------ */
 
 function populateSortDropdown(select) {
   if (!select) return;
@@ -178,21 +278,32 @@ function populateSortDropdown(select) {
   select.value = current || '';
 }
 
-/** Build the checkbox list inside the notif columns picker menu. */
-function buildColumnsMenu() {
-  const list = document.getElementById('notifColumnsList');
-  if (!list || allColumns.length === 0) return;
-  const visible = getVisibleCols();
-  const visibleSet = new Set(visible);
+/* ------------------------------------------------------------------ */
+/*  Fields mapping menu                                                */
+/* ------------------------------------------------------------------ */
 
-  list.innerHTML = allColumns.map(col => {
-    const checked = visibleSet.has(col.key) ? ' checked' : '';
-    return `<label class="notif-columns-item">
-      <input type="checkbox" value="${escAttr(col.key)}"${checked}>
-      <span>${escHtml(col.label || col.key)}</span>
-    </label>`;
+function buildFieldsMenu() {
+  const list = document.getElementById('notifFieldsList');
+  if (!list || allColumns.length === 0) return;
+  const mapping = getFieldMapping();
+
+  list.innerHTML = FIELD_KEYS.map(fk => {
+    const selVal = mapping[fk] || 'auto';
+    let opts = '<option value="auto" selected>Auto</option>';
+    for (const col of allColumns) {
+      const sel = col.key === selVal ? ' selected' : '';
+      opts += `<option value="${escAttr(col.key)}"${sel}>${escHtml(col.label || col.key)}</option>`;
+    }
+    return `<div class="notif-fields-row">
+      <span class="notif-fields-label">${FIELD_LABELS[fk]}</span>
+      <select class="notif-fields-select" data-field="${fk}">${opts}</select>
+    </div>`;
   }).join('');
 }
+
+/* ------------------------------------------------------------------ */
+/*  Direction icon                                                     */
+/* ------------------------------------------------------------------ */
 
 function updateDirIcon(btn) {
   if (!btn) return;
@@ -204,6 +315,10 @@ function updateDirIcon(btn) {
     btn.title = 'Descending (click for ascending)';
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Data fetching & rendering                                          */
+/* ------------------------------------------------------------------ */
 
 async function fetchNotifications(filters) {
   try {
@@ -228,52 +343,22 @@ function renderNotifications(items) {
     return;
   }
 
-  const visibleCols = getVisibleCols();
+  const mapping = getFieldMapping();
 
-  list.innerHTML = items.map(i => {
-    // Build dynamic fields from visible columns
-    const fields = visibleCols.map(key => {
-      const val = i[key];
-      if (val === null || val === undefined || val === '' || val === 'None') return null;
-      let display = String(val);
-
-      // Format priority as badge
-      if (key.toLowerCase() === 'priority') {
-        return `<span class="badge ${priorityClass(val)}">${escHtml(val)}</span>`;
-      }
-      // Format status with dot
-      if (key.toLowerCase() === 'status') {
-        return `<span class="status-badge ${statusClass(val)}" style="font-size:0.65rem; padding:0 0.375rem;">
-          <span class="dot"></span>${escHtml(val)}
-        </span>`;
-      }
-      // Format dates as relative
-      if (i[key] && typeof i[key] === 'string' && /^\d{4}-\d{2}-\d{2}/.test(i[key])) {
-        return `<span>${relativeTime(i[key])}</span>`;
-      }
-      // Truncate long text
-      if (display.length > 60) display = display.slice(0, 57) + '…';
-      return `<span>${escHtml(display)}</span>`;
-    }).filter(Boolean);
-
-    // Key fields: ID and Description/Title
-    const idVal = i._id || i["Number"] || i["ID"] || '—';
-    const descVal = i._description || '';
+  list.innerHTML = items.map(item => {
+    const f = resolveAllFields(item, mapping);
 
     return `
     <div class="notification-item">
       <div class="flex items-center justify-between">
-        <span class="ticket-id">${escHtml(idVal)}</span>
-        <span class="badge ${priorityClass(i["Priority"])}">${escHtml(i["Priority"] || '—')}</span>
+        <span class="ticket-id">${f.ticketId.display || '—'}</span>
+        ${f.priority.display || ''}
       </div>
-      <div class="desc">${escHtml(descVal)}</div>
+      <div class="desc">${f.description.display || '—'}</div>
       <div class="meta">
-        <span class="status-badge ${statusClass(i["Status"])}" style="font-size:0.65rem; padding:0 0.375rem;">
-          <span class="dot"></span>${escHtml(i["Status"] || '—')}
-        </span>
-        <span>${relativeTime(i._date || i["Creation Date"] || i["Created Date"] || i["Submitted Date"])}</span>
+        ${f.status.display || '<span></span>'}
+        <span>${f.age.display || ''}</span>
       </div>
-      ${fields.length > 0 ? `<div class="notif-extra-fields">${fields.map(f => `<div class="notif-field">${f}</div>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -284,6 +369,10 @@ function updateLastUpdated() {
     el.textContent = `Updated ${new Date().toLocaleTimeString()}`;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Escape helpers                                                     */
+/* ------------------------------------------------------------------ */
 
 function escHtml(s) {
   if (!s) return '';
