@@ -198,14 +198,14 @@ def get_notifications():
 
 @api_bp.route("/charts-config")
 def get_charts_config():
-    _, chart_cfg = _get_loaders()
+    _, chart_cfg, _ = _get_loaders()
     return jsonify(chart_cfg.load())
 
 
 @api_bp.route("/charts-config", methods=["POST"])
 def save_charts_config():
     """Save updated chart card configuration (order, width) back to JSON file."""
-    _, chart_cfg = _get_loaders()
+    _, chart_cfg, _ = _get_loaders()
     data = request.get_json(silent=True) or {}
     cards = data.get("cards")
     if not isinstance(cards, list):

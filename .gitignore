@@ -2,3 +2,4 @@ __pycache__
 .lean-ctx
 plan.md
 promt.md
+config/datasets.json
