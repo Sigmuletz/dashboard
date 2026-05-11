@@ -178,11 +178,22 @@ def get_filter_options():
 def get_notifications():
     data_loader, _ = _get_loaders()
     rows = data_loader.all()
-    # Find a date column for sorting
-    creation_col = _find_date_col(rows, "creat") or _find_date_col(rows, "submitt") or _find_date_col(rows, "date")
-    if creation_col:
-        rows = sorted(rows, key=lambda r: r.get(creation_col) or date.min, reverse=True)
-    return jsonify([_serialize_row(r) for r in rows[:10]])
+
+    # Determine sort column (from query param, or auto-detect date)
+    sort_col = request.args.get("sort", "")
+    sort_order = request.args.get("order", "desc").lower()
+    limit = min(int(request.args.get("limit", "10") or 10), 100)
+
+    if sort_col and sort_col in (rows[0] if rows else {}):
+        reverse = sort_order != "asc"
+        rows = sorted(rows, key=lambda r: r.get(sort_col) or date.min if isinstance(r.get(sort_col), date) else (r.get(sort_col) or ""), reverse=reverse)
+    else:
+        # Fallback: auto-detect a date column for sorting
+        creation_col = _find_date_col(rows, "creat") or _find_date_col(rows, "submitt") or _find_date_col(rows, "date")
+        if creation_col:
+            rows = sorted(rows, key=lambda r: r.get(creation_col) or date.min, reverse=True)
+
+    return jsonify([_serialize_row(r) for r in rows[:limit]])
 
 
 @api_bp.route("/charts-config")

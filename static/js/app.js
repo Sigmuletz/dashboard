@@ -8,6 +8,7 @@ import { initColumns } from './columns.js';
 import { initNotifications } from './notifications.js';
 import { initCharts } from './charts.js';
 import { initViews } from './views.js';
+import { initChartEditor, initChartEditorButtons } from './chart-editor.js';
 
 // ----- EventBus -----
 class EventBus {
@@ -192,6 +193,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTable();
   initNotifications();
   initViews();
+  initChartEditor();
+  initChartEditorButtons();
 
   await initColumns();
   await initFilters();

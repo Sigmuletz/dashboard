@@ -1,25 +1,95 @@
 /**
- * notifications.js — Right sidebar showing 10 most recently created incidents.
+ * notifications.js — Right sidebar showing recent activity.
+ * Supports user-configurable sort column, direction, and limit.
  */
 import { bus, apiFetch, relativeTime, statusClass, priorityClass } from './app.js';
 
 let pollInterval;
+let sortCol = '';       // empty = auto-detect date
+let sortOrder = 'desc';
+let limit = 10;
+let columns = [];       // populated for sort dropdown
 
 export function initNotifications() {
+  const sortSelect = document.getElementById('notifSortCol');
+  const dirBtn = document.getElementById('notifSortDir');
+  const limitSelect = document.getElementById('notifLimit');
+
+  // Build sort column dropdown when columns are loaded
+  bus.on('columns-changed', (visibleCols) => {
+    columns = visibleCols || [];
+    populateSortDropdown(sortSelect);
+  });
+
+  // Sort field change
+  sortSelect?.addEventListener('change', () => {
+    sortCol = sortSelect.value;
+    fetchNotifications({});
+  });
+
+  // Sort direction toggle
+  dirBtn?.addEventListener('click', () => {
+    sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    updateDirIcon(dirBtn);
+    fetchNotifications({});
+  });
+
+  // Limit change
+  limitSelect?.addEventListener('change', () => {
+    limit = parseInt(limitSelect.value) || 10;
+    fetchNotifications({});
+  });
+
   bus.on('filters-changed', (filters) => {
     fetchNotifications(filters);
   });
 
-  // Poll every 60 seconds (uses current filter state by re-emitting)
+  // Apply initial sort direction (happens after columns load)
+  bus.on('dataset-changed', () => {
+    sortCol = '';
+    sortOrder = 'desc';
+    limit = 10;
+    if (sortSelect) sortSelect.value = '';
+    if (limitSelect) limitSelect.value = '10';
+    updateDirIcon(dirBtn);
+  });
+
+  // Poll every 60 seconds
   pollInterval = setInterval(() => {
-    // Just re-fetch with no filters for activity feed
     fetchNotifications({});
   }, 60000);
 }
 
+function populateSortDropdown(select) {
+  if (!select) return;
+  // Preserve current selection
+  const current = select.value;
+  select.innerHTML = '<option value="">Auto (date)</option>';
+  for (const col of columns) {
+    const sel = col.key === current ? ' selected' : '';
+    select.innerHTML += `<option value="${escAttr(col.key)}"${sel}>${escHtml(col.label || col.key)}</option>`;
+  }
+  select.value = current || '';
+}
+
+function updateDirIcon(btn) {
+  if (!btn) return;
+  if (sortOrder === 'asc') {
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/></svg>';
+    btn.title = 'Ascending (click for descending)';
+  } else {
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/></svg>';
+    btn.title = 'Descending (click for ascending)';
+  }
+}
+
 async function fetchNotifications(filters) {
   try {
-    const notifications = await apiFetch('/api/notifications', filters);
+    const params = { ...filters };
+    if (sortCol) params.sort = sortCol;
+    params.order = sortOrder;
+    params.limit = limit;
+    const notifications = await apiFetch('/api/notifications', params);
     renderNotifications(notifications);
     updateLastUpdated();
   } catch (err) {
@@ -58,4 +128,16 @@ function updateLastUpdated() {
   if (el) {
     el.textContent = `Updated ${new Date().toLocaleTimeString()}`;
   }
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function escAttr(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

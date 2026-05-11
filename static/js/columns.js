@@ -87,6 +87,19 @@ function emitChange() {
   bus.emit('columns-changed', getVisibleColumns());
 }
 
+function selectAll() {
+  state.visible = ALL_COLUMNS.map(c => c.key);
+  emitChange();
+}
+
+function deselectAll() {
+  // Keep at least one column visible
+  if (ALL_COLUMNS.length > 0) {
+    state.visible = [ALL_COLUMNS[0].key];
+  }
+  emitChange();
+}
+
 /* ── Dropdown UI ─────────────────────────────────────────────────── */
 
 let draggedIndex = null;
@@ -194,6 +207,10 @@ export async function initColumns() {
   }
 
   renderList();
+
+  /* ── Select All / Deselect All buttons ── */
+  document.getElementById('colSelectAll')?.addEventListener('click', () => selectAll());
+  document.getElementById('colDeselectAll')?.addEventListener('click', () => deselectAll());
 
   /* ── Toggle menu ── */
   button.addEventListener('click', (e) => {

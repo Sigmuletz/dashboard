@@ -13,10 +13,13 @@ from src.data_loader import ChartConfigLoader, DataLoader
 
 def _watch_csv_files(loaders, registry, base_dir):
     """Background daemon thread: poll CSV mtimes every 2s, auto-reload on change."""
+    def _resolve(p):
+        return p if os.path.isabs(p) else os.path.join(base_dir, p)
+
     # Build path tracking: {csv_path: {"mtime": float, "ids": [dataset_id, ...]}}
     path_map = {}
     for ds in registry["datasets"]:
-        csv_path = os.path.join(base_dir, ds["csv"])
+        csv_path = _resolve(ds["csv"])
         try:
             mtime = os.path.getmtime(csv_path)
         except OSError:
@@ -51,10 +54,13 @@ def create_app() -> Flask:
         registry = json.load(f)
 
     # Initialize all datasets from registry
+    def _resolve(p):
+        return p if os.path.isabs(p) else os.path.join(base_dir, p)
+
     loaders = {}
     for ds in registry["datasets"]:
-        csv_path = os.path.join(base_dir, ds["csv"])
-        charts_path = os.path.join(base_dir, ds["charts"])
+        csv_path = _resolve(ds["csv"])
+        charts_path = _resolve(ds["charts"])
         loaders[ds["id"]] = (
             DataLoader(csv_path),
             ChartConfigLoader(charts_path),

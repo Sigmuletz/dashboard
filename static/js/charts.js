@@ -90,6 +90,26 @@ export function initCharts() {
     // Will be re-triggered by filters-changed from filters.js
   });
 
+  // Chart editor saved → invalidate cache and re-render with current filters
+  bus.on('charts-config-saved', () => {
+    cachedConfig = null;
+    for (const id of Object.keys(chartInstances)) {
+      try { chartInstances[id].destroy(); } catch (e) { /* ignore */ }
+      delete chartInstances[id];
+    }
+    if (lazyObserver) {
+      lazyObserver.disconnect();
+      lazyObserver = null;
+    }
+    renderedCardIds.clear();
+    cardElements = {};
+    renderActive = false;
+    pendingRender = null;
+    const grid = document.getElementById('chartGrid');
+    if (grid) grid.innerHTML = '';
+    doRender(lastFilters);
+  });
+
   // Sidebar toggle → resize all chart instances
   document.getElementById('sidebarToggle')?.addEventListener('click', () => {
     // Wait for CSS transition (280ms)
