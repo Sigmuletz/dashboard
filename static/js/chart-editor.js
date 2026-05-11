@@ -12,6 +12,7 @@ let columns = [];          // column metadata: [{key, label, type}, ...]
 let columnValues = {};     // {columnKey: [distinct values]} for filter dropdowns
 let dirty = false;
 let draggedCardIdx = null;
+let eventsReady = false;
 
 /* ── Public: init ────────────────────────────────────────────────── */
 
@@ -50,6 +51,7 @@ export function initChartEditor() {
     columns = [];
     columnValues = {};
     dirty = false;
+    eventsReady = false;
   });
 }
 
@@ -73,6 +75,16 @@ async function openPanel() {
 
   dirty = false;
   renderCards();
+
+  // Attach delegated event listeners once per panel session
+  if (!eventsReady) {
+    const list = panelEl.querySelector('.chart-editor-list');
+    if (list) {
+      attachCardEvents(list);
+      eventsReady = true;
+    }
+  }
+
   panelEl.classList.add('open');
   overlayEl?.classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -85,6 +97,7 @@ function closePanel() {
   document.body.style.overflow = '';
   cards = [];
   dirty = false;
+  eventsReady = false;
 }
 
 /* ── Render ──────────────────────────────────────────────────────── */
@@ -222,9 +235,6 @@ function renderCards() {
       </div>`;
     }).join('');
   }
-
-  // Attach event listeners
-  attachCardEvents(list);
 }
 
 function renderFilterRow(cardIdx, field, values) {
@@ -240,7 +250,7 @@ function renderFilterRow(cardIdx, field, values) {
     <select data-action="filter-field" data-idx="${cardIdx}" data-old-field="${escAttr(field)}" class="chart-editor-select chart-editor-filter-field">
       ${columnOpts}
     </select>
-    <input type="text" value="${escAttr(valStr)}" data-action="filter-values" data-idx="${cardIdx}" data-field="${escAttr(field)}" placeholder="value1,value2" class="chart-editor-input chart-editor-filter-values">
+    <input type="text" value="${escAttr(valStr)}" data-action="filter-values" data-idx="${cardIdx}" data-field="${escAttr(field)}" placeholder="value1,$EMPTY,..." class="chart-editor-input chart-editor-filter-values">
     <button class="chart-editor-filter-remove" data-action="remove-filter" data-idx="${cardIdx}" data-field="${escAttr(field)}">&times;</button>
   </div>`;
 }
@@ -253,10 +263,19 @@ function renderNumberSubFilters(idx, card) {
     <div class="chart-editor-number-list" data-idx="${idx}">
       ${numbers.map((n, ni) => `
         <div class="chart-editor-number-row">
-          <input type="text" value="${escAttr(n.label || '')}" data-action="number-label" data-idx="${idx}" data-ni="${ni}" placeholder="Label" class="chart-editor-input" style="width:100px">
-          <input type="text" value="${escAttr(n.color || '')}" data-action="number-color" data-idx="${idx}" data-ni="${ni}" placeholder="Color" class="chart-editor-input" style="width:80px">
-          <input type="text" value="${escAttr(filterToString(n.filter || {}))}" data-action="number-filter" data-idx="${idx}" data-ni="${ni}" placeholder="field:val1,val2" class="chart-editor-input" style="width:160px">
-          <button data-action="remove-number" data-idx="${idx}" data-ni="${ni}" class="chart-editor-filter-remove">&times;</button>
+          <div class="chart-editor-number-field">
+            <span class="chart-editor-number-label">Label</span>
+            <input type="text" value="${escAttr(n.label || '')}" data-action="number-label" data-idx="${idx}" data-ni="${ni}" placeholder="e.g. Total" class="chart-editor-input">
+          </div>
+          <div class="chart-editor-number-field">
+            <span class="chart-editor-number-label">Color</span>
+            <input type="text" value="${escAttr(n.color || '')}" data-action="number-color" data-idx="${idx}" data-ni="${ni}" placeholder="#6366f1" class="chart-editor-input">
+          </div>
+          <div class="chart-editor-number-field chart-editor-number-field-wide">
+            <span class="chart-editor-number-label">Filter</span>
+            <input type="text" value="${escAttr(filterToString(n.filter || {}))}" data-action="number-filter" data-idx="${idx}" data-ni="${ni}" placeholder="Status:New,$EMPTY" class="chart-editor-input">
+          </div>
+          <button data-action="remove-number" data-idx="${idx}" data-ni="${ni}" class="chart-editor-filter-remove" style="align-self:flex-end;margin-bottom:1px">&times;</button>
         </div>
       `).join('')}
     </div>

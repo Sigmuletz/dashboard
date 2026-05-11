@@ -86,9 +86,16 @@ class DataLoader:
                     results = [r for r in results if _date_col_value(r, 'creation') and _date_col_value(r, 'creation') <= cutoff]
             elif values:
                 vals = values if isinstance(values, list) else [values]
+                # Support $EMPTY sentinel for empty/null/missing column values
+                str_vals = [str(v) for v in vals]
+                has_empty = '$EMPTY' in str_vals
+                match_vals = [sv.lower() for sv in str_vals if sv != '$EMPTY']
                 results = [
                     r for r in results
-                    if str(r.get(field, '')).lower() in [str(v).lower() for v in vals]
+                    if (
+                        (has_empty and (r.get(field) is None or str(r.get(field, '')).strip() == ''))
+                        or (match_vals and str(r.get(field, '')).lower() in match_vals)
+                    )
                 ]
         return results
 

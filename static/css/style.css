@@ -786,6 +786,90 @@ table tbody td {
   width: 48px;
   text-align: center;
 }
+
+/* Notif columns picker */
+.notif-columns-picker {
+  position: relative;
+}
+.notif-columns-btn {
+  width: 28px;
+  height: 28px;
+}
+.notif-columns-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 150px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  z-index: 110;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: all var(--transition-fast);
+}
+.notif-columns-picker.open .notif-columns-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.notif-columns-list {
+  padding: 0.25rem 0;
+}
+.notif-columns-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  margin: 0;
+}
+.notif-columns-item:hover {
+  background: var(--surface-hover);
+}
+.notif-columns-item input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.notif-columns-actions {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-top: 1px solid var(--border-light);
+}
+
+/* Extra fields in notification cards */
+.notif-extra-fields {
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+}
+.notif-field {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.notif-field .badge {
+  font-size: 0.6rem;
+}
+.notif-field .status-badge {
+  font-size: 0.6rem !important;
+}
+
 .notif-config-btn {
   width: 28px;
   height: 28px;
@@ -1351,5 +1435,22 @@ tr.overdue:hover {
 .chart-editor-number-row {
   display: flex;
   gap: 0.375rem;
-  align-items: center;
+  align-items: flex-start;
+}
+.chart-editor-number-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  width: 90px;
+}
+.chart-editor-number-field-wide {
+  width: 130px;
+  flex: 1;
+}
+.chart-editor-number-label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
 }
