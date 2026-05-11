@@ -91,6 +91,10 @@ def create_app() -> Flask:
     def index():
         return render_template("index.html")
 
+    @app.route("/embed/<card_id>")
+    def embed_card(card_id):
+        return render_template("embed.html", card_id=card_id)
+
     return app
 
 

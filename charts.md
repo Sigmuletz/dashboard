@@ -443,3 +443,102 @@ Each rule specifies:
 4. **Chart Editor** (`static/js/chart-editor.js`): Add the new type to the type dropdown if it needs custom fields
 
 No other files need changes.
+
+---
+
+## Embedding Cards in External Apps
+
+The dashboard exposes a standalone embed endpoint for rendering individual chart cards in iframes or frames within other applications.
+
+### Endpoint
+
+```
+GET /embed/<card_id>?dataset=<name>&<filter_params>&height=<px>&width=<px>&title=<override>&theme=<name>
+```
+
+### Parameters
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `card_id` (path) | yes | Card ID from chart config (e.g. `total-tickets`, `status-bar`) |
+| `dataset` | no | Dataset name (default: `incidents`). One of: `incidents`, `changes`, `requests` |
+| `height` | no | Fixed card height in pixels. When set, chart fills container; when omitted, chart uses natural aspect ratio |
+| `width` | no | Fixed card width in pixels |
+| `title` | no | Override the card title displayed in the embed header |
+| `theme` | no | Color scheme: `midnight` (default), `charcoal`, `omnitracker` |
+| `*` (any) | no | Filter params are forwarded to the data API. Example: `?Status=New&Priority=High` or comma-separated `?Status=New,In+Progress` |
+
+### Response
+
+Returns a complete standalone HTML page (no dependencies on dashboard UI). The page:
+- Loads Chart.js from CDN (no CORS issues)
+- Fetches data from `/api/chart-data/<card_id>` with all query params forwarded
+- Renders the chart inside a themed card with title
+- Auto-posts its content height via `window.parent.postMessage` for responsive iframe sizing
+
+### Usage Examples
+
+**Basic embed (default dataset, no filters):**
+```html
+<iframe src="http://dashboard:5000/embed/total-tickets"></iframe>
+```
+
+**With dataset and filters:**
+```html
+<iframe src="http://dashboard:5000/embed/status-bar?dataset=incidents&Priority=High,Critical"></iframe>
+```
+
+**Fixed size + theme:**
+```html
+<iframe src="http://dashboard:5000/embed/priority-doughnut?height=300&width=400&theme=charcoal"></iframe>
+```
+
+**Full-width timeline with custom title:**
+```html
+<iframe src="http://dashboard:5000/embed/created-area?dataset=changes&title=Changes+Over+Time&height=250" style="width:100%;border:none;"></iframe>
+```
+
+### Responsive Iframe Sizing
+
+The embed page sends `postMessage` events with the card's rendered height. To auto-resize the iframe:
+
+```js
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'dashboard-card-height') {
+    const iframe = document.querySelector(`iframe[src*="${e.data.cardId}"]`);
+    if (iframe) iframe.style.height = e.data.height + 'px';
+  }
+});
+```
+
+You can also request a height re-measurement by sending to the iframe's `contentWindow`:
+
+```js
+iframe.contentWindow.postMessage({ type: 'request-height' }, '*');
+```
+
+### Supported Chart Types
+
+All 13 chart types supported by the dashboard render correctly in embed mode: `number`, `gauge`, `bar`, `horizontalBar`, `stackedBar`, `doughnut`, `pie`, `polarArea`, `radar`, `line`, `area`, `scatter`, `bubble`.
+
+### Styling
+
+The embed card inherits the dashboard's dark theme aesthetic. No external CSS files are required — all styles are inlined. The card has:
+- Rounded corners (`0.75rem` border-radius)
+- Dark surface card background
+- Uppercase title label
+- Full chart.js interactivity (tooltips, hover, click)
+
+### Limitations
+
+- Chart animations play on each embed load (no "update in place" mode — embeds are static at render time)
+- No lazy loading — the chart renders immediately on page load
+- No dashboard interaction (drag, resize, chart editor) — embed is read-only display
+
+```
+   <iframe src="http://localhost:5000/embed/status-bar?dataset=incidents&Priority=High,Critical" tyle="border:none; width:100%;"></iframe>   
+   <br>
+   <iframe src="http://localhost:5000/embed/incident-counts?dataset=incidents" tyle="border:none; width:100%;" style="width:100%;border:none;"></iframe>
+   <br>
+   <iframe src="http://localhost:5000/embed/change-risk-polar?dataset=changes" tyle="border:none;" style="width: 600;height: 600;"></iframe>
+```

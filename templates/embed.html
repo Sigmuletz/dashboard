@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Card</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  /* ═══ Theme: Midnight (dark) ═══ */
+  :root {
+    --surface: #0b1120;
+    --surface-card: #1a2236;
+    --surface-hover: #1f2a40;
+    --border: rgba(51, 65, 85, 0.5);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #6366f1;
+    --radius: 0.75rem;
+    --radius-sm: 0.5rem;
+    --shadow-card: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  [data-theme="charcoal"] {
+    --surface: #1c1c1c;
+    --surface-card: #2a2a2a;
+    --surface-hover: #323232;
+    --border: rgba(80,76,70,0.45);
+    --text-primary: #e8e4e0;
+    --text-secondary: #a8a49e;
+    --text-muted: #7a7670;
+    --accent: #d4a574;
+  }
+  [data-theme="omnitracker"] {
+    --surface: #101010;
+    --surface-card: #404040;
+    --surface-hover: #4a4a4a;
+    --border: rgba(96,96,96,0.45);
+    --text-primary: #f0f0f0;
+    --text-secondary: #b0b0b0;
+    --text-muted: #808080;
+    --accent: #60b050;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    background: var(--surface);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+
+  .embed-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.875rem 1rem;
+    margin: 0;
+  }
+  .embed-card .card-title {
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.625rem;
+  }
+  .embed-card .chart-body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .embed-card canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none;
+  }
+
+  /* Number card */
+  .number-value {
+    font-size: 2.2rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .number-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+    font-weight: 400;
+  }
+  .number-grid {
+    display: flex;
+    gap: 1.25rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .number-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Gauge */
+  .gauge-wrap {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+  .gauge-overlay {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+  }
+
+  /* Error */
+  .embed-error {
+    color: #ef4444;
+    font-size: 0.75rem;
+    text-align: center;
+    padding: 1.5rem 0;
+  }
+</style>
+</head>
+<body>
+<div class="embed-card" id="embedCard">
+  <div class="card-title" id="cardTitle">Loading…</div>
+  <div class="chart-body" id="chartBody"></div>
+</div>
+
+<script>
+(function() {
+  const PALETTE = [
+    '#6366f1','#8b5cf6','#a78bfa','#c4b5fd',
+    '#10b981','#34d399','#6ee7b7',
+    '#f59e0b','#fbbf24','#fcd34d',
+    '#3b82f6','#60a5fa','#93c5fd',
+    '#ef4444','#f87171',
+    '#64748b','#94a3b8'
+  ];
+
+  const cardId = '{{ card_id }}';
+  const ChartLib = window.Chart;
+
+  // Parse query params -> forward to API
+  const params = new URLSearchParams(window.location.search);
+  const apiParams = new URLSearchParams(params);
+  apiParams.set('card_id', cardId);
+
+  // Read sizing hints
+  const heightHint = params.get('height');
+  const widthHint  = params.get('width');
+  const titleOverride = params.get('title');
+
+  if (!ChartLib) {
+    document.getElementById('chartBody').innerHTML = '<div class="embed-error">Chart.js not loaded</div>';
+    return;
+  }
+  ChartLib.defaults.color = '#94a3b8';
+  ChartLib.defaults.borderColor = 'rgba(51,65,85,0.3)';
+  ChartLib.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+
+  let chartInstance = null;
+
+  async function load() {
+    const body = document.getElementById('chartBody');
+    try {
+      const resp = await fetch(`/api/chart-data/${cardId}?${apiParams.toString()}`);
+      if (!resp.ok) {
+        throw new Error(`API returned ${resp.status}`);
+      }
+      const data = await resp.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const title = titleOverride || data.title || 'Card';
+      document.getElementById('cardTitle').textContent = title;
+
+      switch (data.type) {
+        case 'number':  renderNumber(data); break;
+        case 'gauge':   renderGauge(data); break;
+        default:        renderChart(data); break;
+      }
+    } catch (err) {
+      body.innerHTML = `<div class="embed-error">${err.message}</div>`;
+    }
+  }
+
+  /* ═══ Number ═══ */
+  function renderNumber(data) {
+    const body = document.getElementById('chartBody');
+    if (data.numbers) {
+      const items = data.numbers.map(n =>
+        `<div class="number-item">
+          <div class="number-value" style="color:${n.color||'#fff'}">${n.value}</div>
+          <div class="number-label">${n.label}</div>
+        </div>`
+      ).join('');
+      body.innerHTML = `<div class="number-grid">${items}</div>`;
+    } else {
+      body.innerHTML = `
+        <div style="text-align:center">
+          <div class="number-value" style="color:${data.color||'#fff'}">${data.value}</div>
+          <div class="number-label">total</div>
+        </div>`;
+    }
+  }
+
+  /* ═══ Gauge ═══ */
+  function renderGauge(data) {
+    const body = document.getElementById('chartBody');
+    const pct = Math.min(Math.max(data.percentage||0,0), 100);
+    const gaugeH = heightHint ? parseInt(heightHint) - 44 : 120;
+    body.innerHTML = `
+      <div class="gauge-wrap" style="height:${gaugeH}px">
+        <canvas id="gaugeCnv" style="max-height:${gaugeH}px"></canvas>
+        <div class="gauge-overlay">
+          <div class="number-value" style="font-size:1.3rem;color:${data.color||'#ef4444'}">${data.value}</div>
+          <div class="number-label">of ${data.max} overdue</div>
+        </div>
+      </div>`;
+
+    const canvas = document.getElementById('gaugeCnv');
+    if (!canvas) return;
+    chartInstance = new ChartLib(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [pct, 100 - pct],
+          backgroundColor: [data.color||'#ef4444', 'rgba(51,65,85,0.4)'],
+          borderWidth: 0,
+          circumference: 270,
+          rotation: 225,
+        }]
+      },
+      options: {
+        cutout: '75%',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display:false }, tooltip: { enabled:false } }
+      }
+    });
+  }
+
+  /* ═══ Canvas charts (bar, line, area, doughnut, pie, polarArea, radar, horizontalBar, stackedBar, scatter, bubble) ═══ */
+  function renderChart(data) {
+    const body = document.getElementById('chartBody');
+    body.innerHTML = `<canvas id="mainCnv"></canvas>`;
+    const canvas = document.getElementById('mainCnv');
+    if (!canvas) return;
+
+    const type = data.type;
+    const isMulti = (type === 'scatter' || type === 'bubble' || type === 'stackedBar');
+    const isPieFamily = (type === 'doughnut' || type === 'pie' || type === 'polarArea' || type === 'radar');
+    const isTime = (type === 'scatter' || type === 'bubble');
+
+    // Build datasets
+    let datasets;
+    if (isMulti) {
+      datasets = (data.datasets || []).map((ds, i) => {
+        const base = { label: ds.label, data: ds.data || [] };
+        if (type === 'stackedBar') {
+          return { ...base, backgroundColor: ds.backgroundColor || PALETTE[i % PALETTE.length], borderRadius: i === (data.datasets||[]).length-1 ? 4 : 0, borderSkipped: false };
+        }
+        if (type === 'scatter') {
+          return { ...base, backgroundColor: ds.backgroundColor || '#6366f1', borderColor: ds.borderColor || ds.backgroundColor || '#6366f1', pointRadius: ds.pointRadius||4, pointHoverRadius: ds.pointHoverRadius||7, showLine: true, tension: 0.2 };
+        }
+        if (type === 'bubble') {
+          return { ...base, backgroundColor: ds.backgroundColor || '#6366f1', borderColor: ds.borderColor || ds.backgroundColor || '#6366f1', borderWidth: 1, hoverBorderWidth: 2 };
+        }
+        return base;
+      });
+    } else if (isPieFamily) {
+      datasets = [{
+        data: data.values || [],
+        backgroundColor: PALETTE.slice(0, (data.labels||[]).length),
+        borderWidth: 2,
+        borderColor: '#1a2236',
+      }];
+    } else if (type === 'area') {
+      const color = data.color || '#10b981';
+      datasets = [{
+        label: data.title || 'Count',
+        data: data.values || [],
+        borderColor: color,
+        backgroundColor: color + '30',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 3,
+        pointBackgroundColor: color,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+        borderWidth: 2,
+      }];
+    } else if (type === 'line') {
+      const color = data.color || '#10b981';
+      datasets = [{
+        label: 'Created',
+        data: data.values || [],
+        borderColor: color,
+        backgroundColor: color + '20',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: color,
+        borderWidth: 2,
+      }];
+    } else {
+      // bar, horizontalBar
+      datasets = [{
+        label: data.title,
+        data: data.values || [],
+        backgroundColor: data.color || '#6366f1',
+        borderRadius: 4,
+        borderSkipped: false,
+      }];
+    }
+
+    // Chart.js type mapping
+    const chartJsType = (type === 'horizontalBar') ? 'bar' :
+                        (type === 'area' || type === 'line') ? 'line' :
+                        (type === 'stackedBar') ? 'bar' :
+                        type;
+
+    // Scales
+    let scales = {};
+    if (type === 'horizontalBar') {
+      scales = {
+        x: { grid: { color: 'rgba(51,65,85,0.2)' }, ticks: { color: '#64748b', stepSize: 1 } },
+        y: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+      };
+    } else if (type === 'stackedBar') {
+      scales = {
+        x: { stacked: true, grid: { display: false }, ticks: { color: '#64748b' } },
+        y: { stacked: true, grid: { color: 'rgba(51,65,85,0.2)' }, ticks: { color: '#64748b', stepSize: 1 } }
+      };
+    } else if (isTime) {
+      scales = {
+        x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d' } }, grid: { display: false }, ticks: { color: '#64748b', maxTicksLimit: 8 } },
+        y: { grid: { color: 'rgba(51,65,85,0.2)' }, ticks: { color: '#64748b', stepSize: 1 } }
+      };
+      if (type === 'bubble') {
+        scales.y.title = { display: true, text: 'Avg Priority', color: '#64748b', font: { size: 10 } };
+        scales.y.min = 0.5;
+        scales.y.max = 4.5;
+      }
+    } else if (type === 'radar') {
+      scales = {
+        r: {
+          grid: { color: 'rgba(51,65,85,0.3)' },
+          angleLines: { color: 'rgba(51,65,85,0.3)' },
+          pointLabels: { color: '#94a3b8', font: { size: 11 } },
+          ticks: { color: '#64748b', backdropColor: 'transparent', stepSize: 1 }
+        }
+      };
+    } else if (type === 'polarArea') {
+      scales = {
+        r: {
+          grid: { color: 'rgba(51,65,85,0.3)' },
+          ticks: { color: '#64748b', backdropColor: 'transparent', stepSize: 1 }
+        }
+      };
+    } else if (type === 'bar') {
+      scales = {
+        x: { grid: { display: false }, ticks: { color: '#64748b' } },
+        y: { grid: { color: 'rgba(51,65,85,0.2)' }, ticks: { color: '#64748b', stepSize: 1 } }
+      };
+    } else if (type === 'line' || type === 'area') {
+      scales = {
+        x: { grid: { display: false }, ticks: { color: '#64748b', maxTicksLimit: 8, maxRotation: 45 } },
+        y: { grid: { color: 'rgba(51,65,85,0.2)' }, ticks: { color: '#64748b', stepSize: 1 } }
+      };
+    }
+
+    // Legend
+    const showLegend = isMulti || isPieFamily;
+    const legend = showLegend ? {
+      position: 'bottom',
+      labels: { color: '#94a3b8', padding: 12, font: { size: 10 }, usePointStyle: true, pointStyleWidth: 8 }
+    } : { display: false };
+
+    // Options
+    const options = {
+      responsive: true,
+      maintainAspectRatio: true,
+      indexAxis: (type === 'horizontalBar') ? 'y' : 'x',
+      plugins: { legend, tooltip: {} },
+      scales: (type === 'doughnut' || type === 'pie') ? {} : scales,
+    };
+    if (type === 'doughnut') options.cutout = '55%';
+
+    chartInstance = new ChartLib(canvas.getContext('2d'), {
+      type: chartJsType,
+      data: {
+        labels: data.labels || [],
+        datasets: datasets,
+      },
+      options: options,
+    });
+  }
+
+  // ── Sizing: if height/width hints provided, apply ──
+  function applySizing() {
+    const h = heightHint ? parseInt(heightHint) : null;
+    const w = widthHint  ? parseInt(widthHint)  : null;
+    const card = document.getElementById('embedCard');
+    if (h) card.style.height = h + 'px';
+    if (w) card.style.width = w + 'px';
+    if (h || w) {
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+      const body = document.getElementById('chartBody');
+      body.style.flex = '1';
+      body.style.minHeight = '0';
+    }
+  }
+
+  // ── Post height to parent for responsive iframe ──
+  function postHeight() {
+    const h = document.getElementById('embedCard').scrollHeight + 16; // 16px body margin
+    window.parent.postMessage({ type: 'dashboard-card-height', cardId: cardId, height: h }, '*');
+  }
+
+  // Run
+  applySizing();
+  load().then(() => {
+    setTimeout(postHeight, 200);  // after Chart.js render
+    setTimeout(postHeight, 800);  // after animations settle
+  });
+
+  // Watch for parent resize request
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'request-height') {
+      postHeight();
+    }
+  });
+})();
+</script>
+</body>
+</html>
