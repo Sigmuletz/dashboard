@@ -123,6 +123,39 @@ def _date_col_value(row: dict, keyword: str) -> Optional[date]:
     return None
 
 
+class HighlightingLoader:
+    """Loads row/cell highlighting configuration from a JSON file."""
+
+    def __init__(self, config_path: Optional[str] = None):
+        self._path = config_path or os.path.join(CONFIG_DIR, "incidents_highlighting.json")
+        self._config: dict = {}
+
+    def load(self) -> dict:
+        try:
+            with open(self._path) as f:
+                self._config = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self._config = {"rowRules": [], "cellRules": []}
+        return self._config
+
+    @property
+    def row_rules(self) -> list[dict]:
+        if not self._config:
+            self.load()
+        return self._config.get("rowRules", [])
+
+    @property
+    def cell_rules(self) -> list[dict]:
+        if not self._config:
+            self.load()
+        return self._config.get("cellRules", [])
+
+    def save(self, config: dict) -> None:
+        self._config = config
+        with open(self._path, 'w') as f:
+            json.dump(self._config, f, indent=2)
+
+
 class ChartConfigLoader:
     """Loads chart card configuration from charts.json."""
 

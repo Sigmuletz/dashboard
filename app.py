@@ -8,7 +8,7 @@ import time
 from flask import Flask, render_template
 
 from src.api import api_bp, init_api
-from src.data_loader import ChartConfigLoader, DataLoader
+from src.data_loader import ChartConfigLoader, DataLoader, HighlightingLoader
 
 
 def _watch_csv_files(loaders, registry, base_dir):
@@ -61,14 +61,17 @@ def create_app() -> Flask:
     for ds in registry["datasets"]:
         csv_path = _resolve(ds["csv"])
         charts_path = _resolve(ds["charts"])
+        hl_path = _resolve(ds.get("highlighting", "config/incidents_highlighting.json"))
         loaders[ds["id"]] = (
             DataLoader(csv_path),
             ChartConfigLoader(charts_path),
+            HighlightingLoader(hl_path),
         )
 
-    # Pre-load all chart configs
-    for _, chart_cfg in loaders.values():
+    # Pre-load all chart configs and highlighting configs
+    for _, chart_cfg, hl_cfg in loaders.values():
         chart_cfg.load()
+        hl_cfg.load()
 
     # Inject into API blueprint
     init_api(loaders, registry)

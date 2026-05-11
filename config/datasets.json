@@ -4,19 +4,22 @@
       "id": "incidents",
       "title": "Incidents",
       "csv": "data/incidents.csv",
-      "charts": "config/incidents_charts.json"
+      "charts": "config/incidents_charts.json",
+      "highlighting": "config/incidents_highlighting.json"
     },
     {
       "id": "changes",
       "title": "Changes",
       "csv": "data/changes.csv",
-      "charts": "config/changes_charts.json"
+      "charts": "config/changes_charts.json",
+      "highlighting": "config/changes_highlighting.json"
     },
     {
       "id": "requests",
       "title": "Requests",
       "csv": "data/requests.csv",
-      "charts": "config/requests_charts.json"
+      "charts": "config/requests_charts.json",
+      "highlighting": "config/requests_highlighting.json"
     }
   ]
 }

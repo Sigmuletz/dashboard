@@ -111,6 +111,11 @@
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-500" id="tableSectionTitle">Items</h2>
           <div class="flex items-center gap-2">
+            <!-- Highlighting Editor -->
+            <button id="hlEditorToggle" class="column-picker-btn" title="Configure row/cell highlighting">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+              <span>Styles</span>
+            </button>
             <!-- Column Picker -->
             <div class="column-picker" id="columnPickerContainer">
               <button id="columnPickerBtn" class="column-picker-btn" title="Select columns">
@@ -235,6 +240,18 @@
       });
     })();
   </script>
+
+  <!-- Highlighting Editor Overlay + Panel -->
+  <div id="hlEditorOverlay" class="chart-editor-overlay"></div>
+  <div id="hlEditorPanel" class="chart-editor-panel">
+    <div class="chart-editor-panel-header">
+      <h2>Highlighting Rules</h2>
+      <button class="hl-editor-close chart-editor-close" title="Close">&times;</button>
+    </div>
+    <div class="hl-editor-body" style="flex:1;overflow-y:auto;padding:1rem 1.25rem">
+      <!-- Rendered by highlighting-editor.js -->
+    </div>
+  </div>
 
   <!-- Chart Editor Overlay + Panel -->
   <div id="chartEditorOverlay" class="chart-editor-overlay"></div>

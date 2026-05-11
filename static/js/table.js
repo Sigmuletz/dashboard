@@ -1,15 +1,21 @@
 /**
- * table.js — Incident table with sorting, search, and overdue highlighting.
+ * table.js — Item table with sorting, search, and configurable highlighting.
  * Column visibility + ordering driven by columns.js (metadata from API).
- * Rendering is type-based — no hardcoded column names.
+ * Row/cell highlighting rules loaded from /api/highlighting (per dataset).
  */
-import { bus, apiFetch, relativeTime, statusClass, priorityClass, getDataset } from './app.js';
+import { bus, apiFetch, relativeTime, getDataset } from './app.js';
 import { getVisibleColumns } from './columns.js';
 
 let incidents = [];
 let sortField = null;
 let sortDir = 'desc';
 let visibleColumns = [];
+
+// Highlighting config from API — refreshed on dataset switch
+let rowRules = [];
+let cellRules = [];
+// Quick lookup: {columnKey: {value: {class, badge}}}
+let cellRuleMap = {};
 
 function sortKey() { return `dashboard-sort-${getDataset()}`; }
 function searchKey() { return `dashboard-search-${getDataset()}`; }
@@ -42,7 +48,52 @@ function loadSearch() {
   try { return localStorage.getItem(searchKey()) || ''; } catch (e) { return ''; }
 }
 
-/* ── Cell renderers by type ──────────────────────────────────────── */
+/* ── Highlighting config ─────────────────────────────────────────── */
+
+async function loadHighlighting() {
+  try {
+    const config = await apiFetch('/api/highlighting');
+    rowRules = config.rowRules || [];
+    cellRules = config.cellRules || [];
+    buildCellRuleMap();
+  } catch (e) {
+    console.error('[Table] Failed to load highlighting config:', e);
+    rowRules = [];
+    cellRules = [];
+    cellRuleMap = {};
+  }
+}
+
+function buildCellRuleMap() {
+  cellRuleMap = {};
+  for (const rule of cellRules) {
+    if (!rule.column || !rule.mappings) continue;
+    cellRuleMap[rule.column] = {};
+    for (const [value, style] of Object.entries(rule.mappings)) {
+      cellRuleMap[rule.column][value] = style;
+    }
+  }
+}
+
+/** Apply row rules to determine CSS classes for a given row. */
+function getRowClasses(row) {
+  const classes = [];
+  for (const rule of rowRules) {
+    const cond = rule.condition || {};
+    if (cond.type === 'overdue' && row.is_overdue) {
+      classes.push(rule.style?.rowClass || 'overdue');
+    } else if (cond.column && cond.value !== undefined) {
+      const rowVal = String(row[cond.column] || '');
+      if (rowVal === String(cond.value)) {
+        if (rule.style?.rowClass) classes.push(rule.style.rowClass);
+      }
+    }
+  }
+  return classes.join(' ');
+}
+
+/* ── Cell renderers ──────────────────────────────────────────────── */
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str ?? '';
@@ -53,17 +104,28 @@ function renderCell(value, col) {
   const type = col.type;
   const raw = value != null ? String(value) : '\u2014';
 
+  // Check cell rule map for custom styling
+  const mapping = cellRuleMap[col.key]?.[raw];
+  if (mapping) {
+    if (mapping.badge) {
+      return `<span class="badge ${mapping.class || ''}">${escapeHtml(raw)}</span>`;
+    }
+    if (mapping.class) {
+      return `<span class="${mapping.class}">${escapeHtml(raw)}</span>`;
+    }
+  }
+
+  // Fallback: type-based rendering
   switch (type) {
     case 'status':
-      return `<span class="status-badge ${statusClass(raw)}"><span class="dot"></span>${escapeHtml(raw)}</span>`;
+      return `<span class="status-badge"><span class="dot"></span>${escapeHtml(raw)}</span>`;
     case 'priority':
-      return `<span class="badge ${priorityClass(raw)}">${escapeHtml(raw)}</span>`;
+      return `<span class="badge">${escapeHtml(raw)}</span>`;
     case 'date':
       return `<span class="text-slate-500 text-xs">${value ? relativeTime(raw) : '\u2014'}</span>`;
     case 'id':
       return `<span class="font-mono text-xs text-indigo-400 font-semibold">${escapeHtml(raw)}</span>`;
     default: {
-      // Truncate long text
       const escaped = escapeHtml(raw);
       if (raw.length > 60) {
         return `<span class="max-w-[200px] truncate block" title="${escaped}">${escaped}</span>`;
@@ -86,7 +148,6 @@ function renderHead() {
       }).join('')}
     </tr>`;
 
-  // Re-attach sort listeners
   thead.querySelectorAll('th.sortable').forEach(th => {
     th.addEventListener('click', () => {
       const field = th.dataset.sort;
@@ -109,16 +170,16 @@ function renderBody(filtered) {
   if (!tbody) return;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${visibleColumns.length}" class="py-8 text-center text-slate-600">No incidents match the current filters</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${visibleColumns.length}" class="py-8 text-center text-slate-600">No items match the current filters</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered.map(row => {
-    const overdueClass = row.is_overdue ? 'overdue' : '';
+    const rowClass = getRowClasses(row);
     const cells = visibleColumns.map(col => {
       return `<td>${renderCell(row[col.key], col)}</td>`;
     }).join('');
-    return `<tr class="${overdueClass}">${cells}</tr>`;
+    return `<tr class="${rowClass}">${cells}</tr>`;
   }).join('');
 }
 
@@ -134,7 +195,6 @@ function updateSortHeaders() {
 function sortAndRender(searchQuery = '') {
   let filtered = [...incidents];
 
-  // Search across all visible column values
   if (searchQuery) {
     filtered = filtered.filter(row => {
       return visibleColumns.some(col => {
@@ -144,7 +204,6 @@ function sortAndRender(searchQuery = '') {
     });
   }
 
-  // Sort
   if (sortField) {
     const sortCol = visibleColumns.find(c => c.key === sortField);
     const isDate = sortCol && sortCol.type === 'date';
@@ -179,7 +238,6 @@ export function initTable() {
 
   bus.on('columns-changed', (cols) => {
     visibleColumns = cols;
-    // Validate sortField against new columns, fall back to first sortable
     const inColumns = visibleColumns.find(c => c.key === sortField);
     if (!sortField || !inColumns) {
       const firstSortable = visibleColumns.find(c => c.sortable);
@@ -187,14 +245,13 @@ export function initTable() {
     }
     renderHead();
     updateSortHeaders();
-    // Re-apply search from input
     const searchEl = document.getElementById('tableSearch');
     const q = searchEl ? searchEl.value.toLowerCase() : '';
     sortAndRender(q);
   });
 
-  // Dataset switch: clear stale data, restore saved sort/search, show skeletons
-  bus.on('dataset-changed', () => {
+  // Dataset switch: reload highlighting config, clear stale data
+  bus.on('dataset-changed', async () => {
     incidents = [];
     loadSort();
     const savedSearch = loadSearch();
@@ -209,12 +266,19 @@ export function initTable() {
       const cols = visibleColumns.length || 5;
       tbody.innerHTML = Array(5).fill(`<tr>${Array(cols).fill('<td><div class="skeleton h-4 w-full"></div></td>').join('')}</tr>`).join('');
     }
+    await loadHighlighting();
+  });
+
+  // Listen for highlighting config saves
+  bus.on('highlighting-config-saved', async () => {
+    await loadHighlighting();
+    // Re-render with current data
+    sortAndRender();
   });
 
   // Search input
   const searchEl = document.getElementById('tableSearch');
   if (searchEl) {
-    // Restore saved search on initial load
     searchEl.value = loadSearch();
     searchEl.addEventListener('input', (e) => {
       const q = e.target.value.toLowerCase();
@@ -223,6 +287,6 @@ export function initTable() {
     });
   }
 
-  // Restore saved sort on initial load
   loadSort();
+  loadHighlighting();
 }

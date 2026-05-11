@@ -9,6 +9,7 @@ import { initNotifications } from './notifications.js';
 import { initCharts } from './charts.js';
 import { initViews } from './views.js';
 import { initChartEditor, initChartEditorButtons } from './chart-editor.js';
+import { initHighlightingEditor } from './highlighting-editor.js';
 
 // ----- EventBus -----
 class EventBus {
@@ -195,6 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initViews();
   initChartEditor();
   initChartEditorButtons();
+  initHighlightingEditor();
 
   await initColumns();
   await initFilters();

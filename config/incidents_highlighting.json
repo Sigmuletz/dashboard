@@ -1,0 +1,34 @@
+{
+  "rowRules": [
+    {
+      "id": "overdue",
+      "condition": { "type": "overdue" },
+      "style": { "rowClass": "overdue" }
+    }
+  ],
+  "cellRules": [
+    {
+      "id": "status-badge",
+      "column": "Status",
+      "type": "status",
+      "mappings": {
+        "New": { "class": "status-new", "badge": true },
+        "In Progress": { "class": "status-in-progress", "badge": true },
+        "Waiting for Info": { "class": "status-waiting", "badge": true },
+        "Resolved": { "class": "status-resolved", "badge": true },
+        "Closed": { "class": "status-closed", "badge": true }
+      }
+    },
+    {
+      "id": "priority-badge",
+      "column": "Priority",
+      "type": "priority",
+      "mappings": {
+        "Critical": { "class": "badge-critical", "badge": true },
+        "High": { "class": "badge-high", "badge": true },
+        "Medium": { "class": "badge-medium", "badge": true },
+        "Low": { "class": "badge-low", "badge": true }
+      }
+    }
+  ]
+}

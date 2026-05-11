@@ -10,7 +10,7 @@ from typing import Optional
 
 from flask import Blueprint, jsonify, request
 
-from .data_loader import ChartConfigLoader, DataLoader
+from .data_loader import ChartConfigLoader, DataLoader, HighlightingLoader
 from .models import is_overdue, parse_date
 
 PALETTE = [
@@ -25,7 +25,7 @@ PALETTE = [
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 # {dataset_name: (DataLoader, ChartConfigLoader)}
-loaders: dict[str, tuple[DataLoader, ChartConfigLoader]] = {}
+loaders: dict[str, tuple[DataLoader, ChartConfigLoader, HighlightingLoader]] = {}
 registry: list[dict] = []
 
 # Map chart groupBy field names → CSV column headers (only non-identity mappings)
@@ -38,7 +38,7 @@ def init_api(dataset_loaders: dict, ds_registry: dict) -> None:
     registry = ds_registry["datasets"]
 
 
-def _get_loaders() -> tuple[DataLoader, ChartConfigLoader]:
+def _get_loaders() -> tuple[DataLoader, ChartConfigLoader, HighlightingLoader]:
     """Get the active dataset's loaders based on ?dataset= query param."""
     dataset = request.args.get("dataset", "incidents")
     if dataset not in loaders:
@@ -143,13 +143,13 @@ def get_datasets():
 
 @api_bp.route("/columns")
 def get_columns():
-    data_loader, _ = _get_loaders()
+    data_loader, _, _ = _get_loaders()
     return jsonify({"columns": data_loader.columns})
 
 
 @api_bp.route("/incidents")
 def get_incidents():
-    data_loader, _ = _get_loaders()
+    data_loader, _, _ = _get_loaders()
     filters = _parse_filter_params()
     rows = data_loader.filter(**filters)
     return jsonify([_serialize_row(r) for r in rows])
@@ -157,7 +157,7 @@ def get_incidents():
 
 @api_bp.route("/filters")
 def get_filter_options():
-    data_loader, _ = _get_loaders()
+    data_loader, _, _ = _get_loaders()
     # Discover available filter fields from column metadata
     filter_fields = []
     for col in data_loader.columns:
@@ -176,7 +176,7 @@ def get_filter_options():
 
 @api_bp.route("/notifications")
 def get_notifications():
-    data_loader, _ = _get_loaders()
+    data_loader, _, _ = _get_loaders()
     rows = data_loader.all()
 
     # Determine sort column (from query param, or auto-detect date)
@@ -303,9 +303,30 @@ def delete_view():
     return jsonify({"ok": True, "name": name})
 
 
+@api_bp.route("/highlighting")
+def get_highlighting():
+    """Get the highlighting config for the current dataset."""
+    _, _, hl_loader = _get_loaders()
+    return jsonify(hl_loader.load())
+
+
+@api_bp.route("/highlighting", methods=["POST"])
+def save_highlighting():
+    """Save highlighting config for the current dataset."""
+    _, _, hl_loader = _get_loaders()
+    data = request.get_json(silent=True) or {}
+    if "rowRules" not in data and "cellRules" not in data:
+        return jsonify({"error": "Expected {rowRules, cellRules}"}), 400
+    try:
+        hl_loader.save(data)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @api_bp.route("/chart-data/<card_id>")
 def get_chart_data(card_id: str):
-    data_loader, chart_cfg = _get_loaders()
+    data_loader, chart_cfg, _ = _get_loaders()
     cards = {c["id"]: c for c in chart_cfg.cards}
     card = cards.get(card_id)
     if not card:
